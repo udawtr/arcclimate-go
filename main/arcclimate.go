@@ -294,14 +294,15 @@ func _get_corrected_msm(msm *MsmData, elevation float64, ele_target float64) *Ms
 	// Returns:
 	//   pd.DataFrame: 補正後のMSMデータフレーム
 	// """
+
+	// 標高差
+	ele_gap := ele_target - elevation
+
 	for i := 0; i < len(msm.date); i++ {
 
 		TMP := msm.TMP[i]
 		PRES := msm.PRES[i]
 		MR := msm.MR[i]
-
-		// 標高差
-		ele_gap := ele_target - elevation
 
 		// 気温補正
 		TMP_corr := get_corrected_TMP(TMP, ele_gap)

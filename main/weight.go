@@ -1,6 +1,9 @@
 package main
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 //距離の重みづけ平均の係数を算出するモジュール
 
@@ -35,8 +38,8 @@ func get_msm_weights(lat float64, lon float64) [4]float64 {
 //
 //	MSM4地点と推計対象地点の距離のリスト(SW,SE,NW,NE)
 func _get_latlon_msm_distances(lat float64, lon float64) [4]float64 {
-	lat_unit := 0.05   // MSMの緯度間隔
-	lon_unit := 0.0625 // MSMの経度間隔
+	const lat_unit = 0.05   // MSMの緯度間隔
+	const lon_unit = 0.0625 // MSMの経度間隔
 
 	lat0 := lat
 	lon0 := lon
@@ -118,18 +121,19 @@ func vincenty_inverse(lat1 float64, lon1 float64, lat2 float64, lon2 float64) fl
 	for i := 0; i < ITERATION_LIMIT; i++ {
 		sinR := math.Sin(ramda)
 		cosR := math.Cos(ramda)
-		sinS = math.Sqrt(math.Pow(cosU2*sinR, 2) + math.Pow(cosU1*sinU2-sinU1*cosU2*cosR, 2))
+		sinS = math.Sqrt((cosU2*sinR)*(cosU2*sinR) + (cosU1*sinU2-sinU1*cosU2*cosR)*(cosU1*sinU2-sinU1*cosU2*cosR))
 		cosS = sinU1*sinU2 + cosU1*cosU2*cosR
 		sigma = math.Atan2(sinS, cosS)
 		sinA := cosU1 * cosU2 * sinR / sinS
-		cos2A = 1 - math.Pow(sinA, 2)
+		cos2A = 1 - (sinA * sinA)
 		cos2Sm = cosS - 2*sinU1*sinU2/cos2A
 		C := ƒ / 16 * cos2A * (4 + ƒ*(4-3*cos2A))
 
 		ramada_p = ramda
-		ramda = L + (1-C)*ƒ*sinA*(sigma+C*sinS*(cos2Sm+C*cosS*(-1+2*math.Pow(cos2Sm, 2))))
+		ramda = L + (1-C)*ƒ*sinA*(sigma+C*sinS*(cos2Sm+C*cosS*(-1+2*(cos2Sm*cos2Sm))))
 
 		// 偏差が.000000000001以下ならbreak
+		fmt.Printf("%.10f\t%.10f\t%.10f\n", ramda, ramada_p, ramda-ramada_p)
 		if math.Abs(ramda-ramada_p) <= 1e-12 {
 			break
 		}
@@ -142,10 +146,10 @@ func vincenty_inverse(lat1 float64, lon1 float64, lat2 float64, lon2 float64) fl
 	}
 
 	// λが所望の精度まで収束したら以下の計算を行う
-	u2 := cos2A * (math.Pow(a, 2) - math.Pow(b, 2)) / (math.Pow(b, 2))
+	u2 := cos2A * (a*a - b*b) / (b * b)
 	A := 1 + u2/16384*(4096+u2*(-768+u2*(320-175*u2)))
 	B := u2 / 1024 * (256 + u2*(-128+u2*(74-47*u2)))
-	dS := B * sinS * (cos2Sm + B/4*(cosS*(-1+2*math.Pow(cos2Sm, 2))-B/6*cos2Sm*(-3+4*math.Pow(sinS, 2))*(-3+4*math.Pow(cos2Sm, 2))))
+	dS := B * sinS * (cos2Sm + B/4*(cosS*(-1+2*(cos2Sm*cos2Sm))-B/6*cos2Sm*(-3+4*(sinS*sinS))*(-3+4*(cos2Sm*cos2Sm))))
 
 	// 2点間の楕円体上の距離
 	s := b * A * (sigma - dS)

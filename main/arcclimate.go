@@ -52,6 +52,8 @@ type MsmTarget struct {
 	PRES      []float64 //9.気圧 (単位:hPa)
 	APCP01    []float64 //10.参照時刻の前1時間の降水量の積算値 (単位:mm/h)
 
+	DSWRF []float64 //標準年の計算時に使用するDSWRF
+
 	//追加項目
 	w_spd []float64 //11.参照時刻時点の風速の瞬時値 (単位:m/s)
 	w_dir []float64 //12.参照時刻時点の風向の瞬時値 (単位:°)
@@ -117,7 +119,7 @@ func interpolate(
 	// ベクトル風速から16方位の風向風速を計算
 	_convert_wind16(msm)
 
-	var df_save MsmTarget
+	var df_save *MsmTarget
 
 	if mode == "normal" {
 		// 保存用に年月日をフィルタ
@@ -130,7 +132,7 @@ func interpolate(
 		end_index := sort.Search(len(msm.date), func(i int) bool {
 			return msm.date[i].After(end_time) || msm.date[i].Equal(end_time)
 		})
-		df_save = MsmTarget{
+		df_save = &MsmTarget{
 			date:      msm.date[start_index:end_index],
 			TMP:       msm.TMP[start_index:end_index],
 			MR:        msm.MR[start_index:end_index],
@@ -149,19 +151,19 @@ func interpolate(
 
 	} else if mode == "EA" {
 		// 標準年の計算
-		// from EA import calc_EA
-		// df_save, select_year = calc_EA(msm,
-		// start_year=start_year,
-		// end_year=end_year,
-		// use_est=use_est)
+		df_save, _ = calc_EA(
+			msm,
+			start_year,
+			end_year,
+			use_est)
 
-		// // ベクトル風速から16方位の風向風速を再計算
-		// _convert_wind16(df_save)
+		// ベクトル風速から16方位の風向風速を再計算
+		_convert_wind16(df_save)
 	} else {
 		panic(mode)
 	}
 
-	return &df_save
+	return df_save
 }
 
 func _get_interpolated_msm(

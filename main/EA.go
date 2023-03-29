@@ -39,7 +39,7 @@ func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*Ms
 
 		local, _ := time.LoadLocation("Local")
 		start_time := time.Date(start_year, 1, 1, 0, 0, 0, 0, local)
-		end_time := time.Date(end_year+1, 1, 1, 0, 0, 0, 0, local)
+		end_time := time.Date(end_year, 12, 31, 23, 0, 0, 0, local)
 		df_targ = exctactMsm(df_msm, start_time, end_time)
 
 		// TODO: drop, rename処理はcopyの後の方がよさそう
@@ -55,7 +55,7 @@ func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*Ms
 
 		local, _ := time.LoadLocation("Local")
 		start_time := time.Date(start_year, 1, 1, 0, 0, 0, 0, local)
-		end_time := time.Date(end_year+1, 1, 1, 0, 0, 0, 0, local)
+		end_time := time.Date(end_year, 12, 31, 23, 0, 0, 0, local)
 		df_targ = exctactMsm(df_msm, start_time, end_time)
 
 		// TODO: drop, rename処理はcopyの後の方がよさそう
@@ -92,7 +92,7 @@ func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*Ms
 	df_fs_ci := get_fs_ci(&df_targ)
 
 	// 信頼区間の判定結果を合成
-	df_ci := make(map[YearMonth]GroupData4, 144)
+	df_ci := make(map[YearMonth]GroupData4, 120)
 	for ym := range df_temp_ci {
 		df_ci[ym] = GroupData4{
 			TMP_mean:    df_temp_ci[ym].TMP,
@@ -454,55 +454,24 @@ func get_fs_ci(df *MsmTarget) map[YearMonth]FSData {
 	const std_rate_APCP01 = 1.5
 	const std_rate_w_spd = 1.5
 
-	//年月インデックス領域確保
-	index_ymd := make(map[int]map[int]map[int][]int, 12)
-	for y := 2010; y <= 2021; y++ {
-		index_ymd[y] = make(map[int]map[int][]int, 12)
-		for m := 1; m <= 12; m++ {
-			index_ymd[y][m] = make(map[int][]int, 31)
-		}
-	}
-
 	//インデックス生成
-	for i := 0; i < len(df.date); i++ {
+	var g_ymd_mean GroupData2
+	for i := 0; i < len(df.date); i += 24 {
 		y := df.date[i].Year()
 		m := int(df.date[i].Month())
-		d := df.date[i].Day() - 1
-		if _, ok := index_ymd[y][m][d]; !ok {
-			index_ymd[y][m][d] = make([]int, 0, 24)
-		}
-		index_ymd[y][m][d] = append(index_ymd[y][m][d], i)
-	}
-
-	var g_ymd_mean GroupData2
-
-	tmp_index_ymd := make(map[int]map[int]map[int]int, 12)
-	var tmp_index_count int
-	for y := range index_ymd {
-		tmp_index_ymd[y] = make(map[int]map[int]int, 12)
-		for m := range index_ymd[y] {
-			tmp_index_ymd[y][m] = make(map[int]int, 31)
-			for d := range index_ymd[y][m] {
-				if len(index_ymd[y][m][d]) > 0 {
-					g_ymd_mean.Year = append(g_ymd_mean.Year, y)
-					g_ymd_mean.Month = append(g_ymd_mean.Month, m)
-					g_ymd_mean.Day = append(g_ymd_mean.Day, d)
-					tmp_index_ymd[y][m][d] = tmp_index_count
-					tmp_index_count++
-				}
-			}
-		}
+		d := df.date[i].Day()
+		g_ymd_mean.Year = append(g_ymd_mean.Year, y)
+		g_ymd_mean.Month = append(g_ymd_mean.Month, m)
+		g_ymd_mean.Day = append(g_ymd_mean.Day, d)
 	}
 
 	//平均を求める関数の定義
-	getMean := func(list []float64, index []int) float64 {
-		n := len(index)
-
+	getMean24H := func(list []float64, index int) float64 {
 		var sum float64
-		for i := 0; i < n; i++ {
-			sum += list[index[i]]
+		for i := 0; i < 24; i++ {
+			sum += list[index+i]
 		}
-		avg := sum / float64(n)
+		avg := sum / 24.0
 
 		return avg
 	}
@@ -511,11 +480,7 @@ func get_fs_ci(df *MsmTarget) map[YearMonth]FSData {
 	getMeanForYearMonthGroupDay := func(list []float64, g *GroupData2) []float64 {
 		mean_list := make([]float64, len(g.Day))
 		for i := 0; i < len(g.Day); i++ {
-			y := g.Year[i]
-			m := g.Month[i]
-			d := g.Day[i]
-			mean := getMean(list, index_ymd[y][m][d])
-			mean_list[i] = mean
+			mean_list[i] = getMean24H(list, i*24)
 		}
 		return mean_list
 	}
@@ -535,7 +500,7 @@ func get_fs_ci(df *MsmTarget) map[YearMonth]FSData {
 	w_spd_FS := make_fs(&g_ymd_mean, func(msm *GroupData2, i int) float64 { return msm.w_spd_mean_ymd[i] }, std_rate_w_spd)
 
 	FS := make(map[YearMonth]FSData)
-	for ym := range FS {
+	for ym := range TMP_FS {
 		FS[ym] = FSData{
 			TMP:    TMP_FS[ym],
 			DSWRF:  DSWRF_FS[ym],
@@ -591,28 +556,38 @@ func make_fs(g_ymd_mean *GroupData2, key func(*GroupData2, int) float64, std_rat
 		FS[i] = math.Abs(cdf_ALL[i] - cdf_year[i])
 	}
 
-	// 年月ごとのFS値の平均を計算 : <key>_FS
-	fs_ym_list := make(map[YearMonth][]float64)
+	// 年月インデックス
+	ym_list := make([]YearMonthIndex, 0, 120)
+	y, m := 0, 0
 	for i := 0; i < len(g_ymd_mean.Day); i++ {
-		k := YearMonth{g_ymd_mean.Year[i], g_ymd_mean.Month[i]}
-		if _, ok := fs_ym_list[k]; !ok {
-			fs_ym_list[k] = []float64{}
+		if g_ymd_mean.Year[i] != y || g_ymd_mean.Month[i] != m {
+			y = g_ymd_mean.Year[i]
+			m = g_ymd_mean.Month[i]
+			ym_list = append(ym_list, YearMonthIndex{y, m, i})
 		}
-		fs_ym_list[k] = append(fs_ym_list[k], FS[i])
 	}
-	fs_ym := make(map[YearMonth]float64)
-	for ym := range fs_ym {
-		fs_ym[ym] = mean(fs_ym_list[ym])
+
+	// 年月ごとのFS値の平均を計算 : <key>_FS
+	fs_ym := make([]float64, len(ym_list))
+	for i, ym := range ym_list {
+		var start, end int
+		start = ym.Index
+		if i < len(ym_list)-1 {
+			end = ym_list[i+1].Index
+		} else {
+			end = len(g_ymd_mean.Day)
+		}
+		fs_ym[i] = mean(FS[start:end])
 	}
 
 	// 月ごとにFS値の偏差 : <key>_FS_std
-	var fs_m_list map[int][]float64
-	for ym := range fs_ym {
+	fs_m_list := make(map[int][]float64, 12)
+	for i, ym := range ym_list {
 		m := ym.Month
 		if _, ok := fs_m_list[m]; !ok {
 			fs_m_list[m] = make([]float64, 0, 20)
 		}
-		fs_m_list[m] = append(fs_m_list[m], fs_ym[ym])
+		fs_m_list[m] = append(fs_m_list[m], fs_ym[i])
 	}
 	fs_std_m := make(map[int]float64)
 	for m := range fs_m_list {
@@ -625,8 +600,9 @@ func make_fs(g_ymd_mean *GroupData2, key func(*GroupData2, int) float64, std_rat
 
 	// 年月ごとにFS値の偏差が指定の範囲に収まっているか
 	typical := make(map[YearMonth]bool)
-	for ym := range fs_ym {
-		if fs_ym[ym] <= std_rate*fs_std_m[ym.Month] {
+	for i, ymi := range ym_list {
+		ym := YearMonth{ymi.Year, ymi.Month}
+		if fs_ym[i] <= std_rate*fs_std_m[ym.Month] {
 			typical[ym] = true
 		} else {
 			typical[ym] = false
@@ -646,6 +622,11 @@ func mean(list []float64) float64 {
 
 type YearMonth struct {
 	Year, Month int
+}
+
+type YearMonthIndex struct {
+	Year, Month int
+	Index       int
 }
 
 func make_cdf(g_ymd_mean *GroupData2, by func(*GroupData2, int) int, key func(*GroupData2, int) float64) []float64 {
@@ -668,8 +649,9 @@ func make_cdf(g_ymd_mean *GroupData2, by func(*GroupData2, int) int, key func(*G
 
 	cdf := make([]float64, len(g_ymd_mean.Day))
 
-	//月ごとの分割: オリジナルの配列のインデックスをmapに格納
-	indexMap := make(map[int][]int, 144)
+	//月or年月ごとの分割: オリジナルの配列のインデックスをmapに格納
+	//(分割基準は by 関数で指定される)
+	indexMap := make(map[int][]int, 120)
 	for i := 0; i < len(g_ymd_mean.Day); i++ {
 		// ex) by = func(msm MsmTarget, i int) int { return msm.date.Month() }
 		k := by(g_ymd_mean, i)

@@ -159,17 +159,21 @@ func exctactMsm(df_msm *MsmTarget, start_time time.Time, end_time time.Time) Msm
 		return df_msm.date[i].After(end_time) || df_msm.date[i].Equal(end_time)
 	})
 	msm := MsmTarget{
-		date:   append([]time.Time{}, df_msm.date[start_index:end_index+1]...),
-		TMP:    append([]float64{}, df_msm.TMP[start_index:end_index+1]...),
-		MR:     append([]float64{}, df_msm.MR[start_index:end_index+1]...),
-		DSWRF:  append([]float64{}, df_msm.DSWRF[start_index:end_index+1]...),
-		Ld:     append([]float64{}, df_msm.Ld[start_index:end_index+1]...),
-		VGRD:   append([]float64{}, df_msm.VGRD[start_index:end_index+1]...),
-		UGRD:   append([]float64{}, df_msm.UGRD[start_index:end_index+1]...),
-		PRES:   append([]float64{}, df_msm.PRES[start_index:end_index+1]...),
-		APCP01: append([]float64{}, df_msm.APCP01[start_index:end_index+1]...),
-		RH:     append([]float64{}, df_msm.RH[start_index:end_index+1]...),
-		Pw:     append([]float64{}, df_msm.Pw[start_index:end_index+1]...),
+		date:    append([]time.Time{}, df_msm.date[start_index:end_index+1]...),
+		TMP:     append([]float64{}, df_msm.TMP[start_index:end_index+1]...),
+		MR:      append([]float64{}, df_msm.MR[start_index:end_index+1]...),
+		DSWRF:   append([]float64{}, df_msm.DSWRF[start_index:end_index+1]...),
+		Ld:      append([]float64{}, df_msm.Ld[start_index:end_index+1]...),
+		VGRD:    append([]float64{}, df_msm.VGRD[start_index:end_index+1]...),
+		UGRD:    append([]float64{}, df_msm.UGRD[start_index:end_index+1]...),
+		PRES:    append([]float64{}, df_msm.PRES[start_index:end_index+1]...),
+		APCP01:  append([]float64{}, df_msm.APCP01[start_index:end_index+1]...),
+		RH:      append([]float64{}, df_msm.RH[start_index:end_index+1]...),
+		Pw:      append([]float64{}, df_msm.Pw[start_index:end_index+1]...),
+		NR:      append([]float64{}, df_msm.NR[start_index:end_index+1]...),
+		DT:      append([]float64{}, df_msm.DT[start_index:end_index+1]...),
+		AAA_est: append([]AAA{}, df_msm.AAA_est[start_index:end_index+1]...),
+		AAA_msm: append([]AAA{}, df_msm.AAA_msm[start_index:end_index+1]...),
 	}
 	if df_msm.w_spd != nil {
 		msm.w_spd = append([]float64{}, df_msm.w_spd[start_index:end_index+1]...)
@@ -193,6 +197,10 @@ func filterMsmLeapYear29th(df_msm *MsmTarget) MsmTarget {
 	APCP01 := []float64{}
 	RH := []float64{}
 	Pw := []float64{}
+	NR := []float64{}
+	DT := []float64{}
+	AAA_est := []AAA{}
+	AAA_msm := []AAA{}
 	// w_spd := []float64{}
 	// w_dir := []float64{}
 
@@ -209,23 +217,31 @@ func filterMsmLeapYear29th(df_msm *MsmTarget) MsmTarget {
 			APCP01 = append(APCP01, df_msm.APCP01[i])
 			RH = append(RH, df_msm.RH[i])
 			Pw = append(Pw, df_msm.Pw[i])
+			NR = append(NR, df_msm.NR[i])
+			DT = append(DT, df_msm.DT[i])
+			AAA_est = append(AAA_est, df_msm.AAA_est[i])
+			AAA_msm = append(AAA_msm, df_msm.AAA_msm[i])
 			// w_spd = append(w_spd, df_msm.w_dir[i])
 			// w_dir = append(w_dir, df_msm.w_dir[i])
 		}
 	}
 
 	return MsmTarget{
-		date:   date,
-		TMP:    TMP,
-		MR:     MR,
-		DSWRF:  DSWRF,
-		Ld:     Ld,
-		VGRD:   VGRD,
-		UGRD:   UGRD,
-		PRES:   PRES,
-		APCP01: APCP01,
-		RH:     RH,
-		Pw:     Pw,
+		date:    date,
+		TMP:     TMP,
+		MR:      MR,
+		DSWRF:   DSWRF,
+		Ld:      Ld,
+		VGRD:    VGRD,
+		UGRD:    UGRD,
+		PRES:    PRES,
+		APCP01:  APCP01,
+		RH:      RH,
+		Pw:      Pw,
+		NR:      NR,
+		DT:      DT,
+		AAA_est: AAA_est,
+		AAA_msm: AAA_msm,
 		// w_spd:     w_spd,
 		// w_dir:     w_dir,
 	}
@@ -904,17 +920,21 @@ func patch_representataive_years(df *MsmTarget, rep_years []int) *MsmTarget {
 	//   pd.DataFrame: 標準年のMSMデータフレーム
 	// """
 	df_EA := MsmTarget{
-		date:   []time.Time{},
-		TMP:    []float64{},
-		MR:     []float64{},
-		DSWRF:  []float64{},
-		Ld:     []float64{},
-		VGRD:   []float64{},
-		UGRD:   []float64{},
-		PRES:   []float64{},
-		APCP01: []float64{},
-		RH:     []float64{},
-		Pw:     []float64{},
+		date:    []time.Time{},
+		TMP:     []float64{},
+		MR:      []float64{},
+		DSWRF:   []float64{},
+		Ld:      []float64{},
+		VGRD:    []float64{},
+		UGRD:    []float64{},
+		PRES:    []float64{},
+		APCP01:  []float64{},
+		RH:      []float64{},
+		Pw:      []float64{},
+		DT:      []float64{},
+		NR:      []float64{},
+		AAA_est: []AAA{},
+		AAA_msm: []AAA{},
 	}
 
 	// 月日数
@@ -944,6 +964,10 @@ func patch_representataive_years(df *MsmTarget, rep_years []int) *MsmTarget {
 		df_EA.APCP01 = append(df_EA.APCP01, df_temp.APCP01...)
 		df_EA.RH = append(df_EA.RH, df_temp.RH...)
 		df_EA.Pw = append(df_EA.Pw, df_temp.Pw...)
+		df_EA.DT = append(df_EA.DT, df_temp.DT...)
+		df_EA.NR = append(df_EA.NR, df_temp.NR...)
+		df_EA.AAA_est = append(df_EA.AAA_est, df_temp.AAA_est...)
+		df_EA.AAA_msm = append(df_EA.AAA_msm, df_temp.AAA_msm...)
 	}
 
 	for i := 0; i < len(df_EA.date); i++ {
@@ -1130,6 +1154,10 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 	APCP01 := [13]float64{}
 	RH := [13]float64{}
 	Pw := [13]float64{}
+	NR := [13]float64{}
+	DT := [13]float64{}
+	AAA_est := [13]AAA{}
+	AAA_msm := [13]AAA{}
 	// w_spd := [13]float64{}
 	// w_dir := [13]float64{}
 
@@ -1145,6 +1173,18 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 		APCP01[i] = df_before.APCP01[i]*before_coef[i] + df_after.APCP01[i]*after_coef[i]
 		RH[i] = df_before.RH[i]*before_coef[i] + df_after.RH[i]*after_coef[i]
 		Pw[i] = df_before.Pw[i]*before_coef[i] + df_after.Pw[i]*after_coef[i]
+		NR[i] = df_before.NR[i]*before_coef[i] + df_after.NR[i]*after_coef[i]
+		AAA_est[i] = AAA{
+			df_before.AAA_est[i].SH*before_coef[i] + df_after.AAA_est[i].SH*after_coef[i],
+			df_before.AAA_est[i].DN*before_coef[i] + df_after.AAA_est[i].DN*after_coef[i],
+			df_before.AAA_est[i].DT*before_coef[i] + df_after.AAA_est[i].DT*after_coef[i],
+		}
+		AAA_msm[i] = AAA{
+			df_before.AAA_msm[i].SH*before_coef[i] + df_after.AAA_msm[i].SH*after_coef[i],
+			df_before.AAA_msm[i].DN*before_coef[i] + df_after.AAA_msm[i].DN*after_coef[i],
+			df_before.AAA_msm[i].DT*before_coef[i] + df_after.AAA_msm[i].DT*after_coef[i],
+		}
+		DT[i] = df_before.DT[i]*before_coef[i] + df_after.DT[i]*after_coef[i]
 		// w_spd[i] = df_before.w_spd[i]*before_coef[i] + df_after.w_spd[i]*after_coef[i]
 		// w_dir[i] = df_before.w_dir[i]*before_coef[i] + df_after.w_dir[i]*after_coef[i]
 	}
@@ -1166,6 +1206,10 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 		df_EA.APCP01[index] = APCP01[i]
 		df_EA.RH[index] = RH[i]
 		df_EA.Pw[index] = Pw[i]
+		df_EA.DT[index] = DT[i]
+		df_EA.NR[index] = NR[i]
+		df_EA.AAA_est[index] = AAA_est[i]
+		df_EA.AAA_msm[index] = AAA_msm[i]
 		// df_EA.w_spd[index] = w_spd[i]
 		// df_EA.w_dir[index] = w_dir[i]
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"time"
@@ -90,6 +91,22 @@ func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*Ms
 	// 0    2011  01  False  False  False   False  False  0.076795
 	// 1    2012  01  False   True  False    True  False  0.149116
 	df_fs_ci := get_fs_ci(&df_targ)
+
+	//TEST: この時点では、df_targ.APCP01の値は正常
+	// for i := 0; i < len(df_targ.date); i++ {
+	// 	fmt.Printf("%d,%d,%d,%d,%.10f\n", df_targ.date[i].Year(), int(df_targ.date[i].Month()), df_targ.date[i].Day(), df_targ.date[i].Hour(), df_targ.APCP01[i])
+	// }
+
+	//FOR TEST
+	// APCP01 にエラーがある。TMP,DSWRF,MR,APCP01,w_spdは問題なし
+	// APCP01は降水量なので、多くの場合0となり」問題が大きくなる
+	for m := 1; m <= 12; m++ {
+		for y := 2011; y <= 2020; y++ {
+			ym := YearMonth{y, m}
+			row := df_fs_ci[ym]
+			fmt.Printf("%d,%d,%t,%t,%t,%t,%t\n", y, m, row.TMP, row.DSWRF, row.MR, row.APCP01, row.w_spd)
+		}
+	}
 
 	// 信頼区間の判定結果を合成
 	df_ci := make(map[YearMonth]GroupData4, 120)
@@ -670,7 +687,8 @@ func make_cdf(g_ymd_mean *GroupData2, by func(*GroupData2, int) int, key func(*G
 		}
 
 		//値(TMP,DSWRF,MR,APCP01 or w_spd)で並べ替え
-		sort.Slice(iv, func(i, j int) bool { return iv[i].Value < iv[j].Value })
+		//値が0の時にソート順が安定しないことがあるため、SliceではなくSliceStable
+		sort.SliceStable(iv, func(i, j int) bool { return iv[i].Value < iv[j].Value })
 
 		//CDFの計算
 		for i := 0; i < len(iv); i++ {
@@ -780,7 +798,8 @@ func _get_representative_years(df_ci map[YearMonth]GroupData4) []int {
 		return min
 	}
 
-	for _, group := range g_m {
+	for m := 1; m <= 12; m++ {
+		group := g_m[m]
 		center_y := get_mean_int(group.Year)
 		var temp_index []int
 
@@ -805,10 +824,12 @@ func _get_representative_years(df_ci map[YearMonth]GroupData4) []int {
 		}
 
 		// 判定指標でループ(候補が単一の年になるまで繰り返す)
-		for _, select_slice := range select_list {
+		for i, select_slice := range select_list {
 
-			temp_index := true_index(select_slice, filter_index)
-			if len(temp_index) == 0 {
+			fmt.Printf("%d\n", i)
+
+			_temp_index := true_index(select_slice, filter_index)
+			if len(_temp_index) == 0 {
 				// group_temp(selectがTrueの年)が0個
 				// =>group(前selectがTrueの年)の中から気温(偏差)が最も小さい年を選定
 
@@ -817,16 +838,17 @@ func _get_representative_years(df_ci map[YearMonth]GroupData4) []int {
 			}
 
 			// group_temp(selectがTrueの年)が1個 => 代表年として選定
-			if len(temp_index) == 1 {
+			if len(_temp_index) == 1 {
+				temp_index = _temp_index
 				break
 			} else {
-				filter_index = temp_index
+				filter_index = _temp_index
 			}
 		}
 
 		// 判定指標がw_spd_fs(最後の判定指標)の時 => 気温(偏差)で判定
 		// or 途中で候補が消失した場合
-		if len(filter_index) != 1 {
+		if len(temp_index) != 1 {
 			// TMP_devが最小の年を抜粋
 			temp_index = []int{}
 			TMP_dev_min := get_min(group.TMP_dev, filter_index)
@@ -898,38 +920,17 @@ func patch_representataive_years(df *MsmTarget, rep_years []int) *MsmTarget {
 	// 月日数
 	mdays := [...]int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
 
-	local, _ := time.LoadLocation("Local")
-
 	// 月別に代表的な年のデータを抜き出す
 	for i, year := range rep_years {
 
 		month := time.Month(i + 1)
 
 		// 当該代表年月の開始日とその次月開始日
-		start_date := time.Date(year, month, 1, 0, 0, 0, 0, local)
-		end_date := start_date.AddDate(0, 0, mdays[int(month)-1])
-
-		start_index := sort.Search(len(df.date), func(i int) bool {
-			return df.date[i].After(start_date) || df.date[i].Equal(start_date)
-		})
-		end_index := sort.Search(len(df.date), func(i int) bool {
-			return df.date[i].After(end_date) || df.date[i].Equal(end_date)
-		})
+		start_date := time.Date(year, month, 1, 0, 0, 0, 0, time.Local)
+		end_date := time.Date(year, month, mdays[int(month)-1], 23, 0, 0, 0, time.Local)
 
 		// 抜き出した代表データ
-		df_temp := MsmTarget{
-			date:   df.date[start_index : end_index+1],
-			TMP:    df.TMP[start_index : end_index+1],
-			MR:     df.MR[start_index : end_index+1],
-			DSWRF:  df.DSWRF[start_index : end_index+1],
-			Ld:     df.Ld[start_index : end_index+1],
-			VGRD:   df.VGRD[start_index : end_index+1],
-			UGRD:   df.UGRD[start_index : end_index+1],
-			PRES:   df.PRES[start_index : end_index+1],
-			APCP01: df.APCP01[start_index : end_index+1],
-			RH:     df.RH[start_index : end_index+1],
-			Pw:     df.Pw[start_index : end_index+1],
-		}
+		df_temp := exctactMsm(df, start_date, end_date)
 
 		// 接合
 		df_EA.date = append(df_EA.date, df_temp.date...)
@@ -946,7 +947,7 @@ func patch_representataive_years(df *MsmTarget, rep_years []int) *MsmTarget {
 	}
 
 	for i := 0; i < len(df_EA.date); i++ {
-		df_EA.date[i] = time.Date(1970, df_EA.date[i].Month(), df_EA.date[i].Day(), df_EA.date[i].Hour(), 0, 0, 0, local)
+		df_EA.date[i] = time.Date(1970, df_EA.date[i].Month(), df_EA.date[i].Day(), df_EA.date[i].Hour(), 0, 0, 0, time.Local)
 	}
 
 	return &df_EA
@@ -1013,7 +1014,7 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 	// after_coef = np.linspace(0, 1, 13, endpoint=True)
 	var before_coef, after_coef [13]float64
 	for i := 0; i < 13; i++ {
-		after_coef[i] = float64(i) * float64(i) / 12.0
+		after_coef[i] = float64(i) / 12.0
 		before_coef[i] = 1.0 - after_coef[i]
 	}
 

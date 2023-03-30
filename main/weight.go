@@ -16,14 +16,14 @@ import (
 // Returns:
 //
 //	MSM4地点(SW,SE,NW,NE)の重みを返す
-func get_msm_weights(lat float64, lon float64) [4]float64 {
+func MsmWeights(lat float64, lon float64) [4]float64 {
 
 	// 補間計算 リストはいずれもSW南西,SE南東,NW北西,NE北東の順
 	// 入力した緯度経度から周囲のMSMまでの距離を算出して、距離の重みづけ係数をリストで返す
-	distances := _get_latlon_msm_distances(lat, lon)
+	distances := latLonMsmDistances(lat, lon)
 
 	// MSM4地点のと目標座標の距離から4地点のウェイトを計算
-	weights := _get_weights_from_distances(distances)
+	weights := weightsFromDistances(distances)
 
 	return weights
 }
@@ -37,7 +37,7 @@ func get_msm_weights(lat float64, lon float64) [4]float64 {
 // Returns:
 //
 //	MSM4地点と推計対象地点の距離のリスト(SW,SE,NW,NE)
-func _get_latlon_msm_distances(lat float64, lon float64) [4]float64 {
+func latLonMsmDistances(lat float64, lon float64) [4]float64 {
 	const lat_unit = 0.05   // MSMの緯度間隔
 	const lon_unit = 0.0625 // MSMの経度間隔
 
@@ -51,37 +51,30 @@ func _get_latlon_msm_distances(lat float64, lon float64) [4]float64 {
 	// 緯度経度差から距離の重みづけ平均の係数を算出
 
 	// 南西（左下）との距離
-	MSM_SW := vincenty_inverse(lat0, lon0, lat_S, lon_W)
+	MSM_SW := vincentyInverse(lat0, lon0, lat_S, lon_W)
 
 	// 南東（右下）との距離
-	MSM_SE := vincenty_inverse(lat0, lon0, lat_S, lon_W+lon_unit)
+	MSM_SE := vincentyInverse(lat0, lon0, lat_S, lon_W+lon_unit)
 
 	// 北西（左上）との距離
-	MSM_NW := vincenty_inverse(lat0, lon0, lat_S+lat_unit, lon_W)
+	MSM_NW := vincentyInverse(lat0, lon0, lat_S+lat_unit, lon_W)
 
 	// 北東（右上）との距離
-	MSM_NE := vincenty_inverse(lat0, lon0, lat_S+lat_unit, lon_W+lon_unit)
+	MSM_NE := vincentyInverse(lat0, lon0, lat_S+lat_unit, lon_W+lon_unit)
 
 	return [4]float64{MSM_SW, MSM_SE, MSM_NW, MSM_NE}
 }
 
-// 緯度経度差から距離を求めるvincenty法(逆解法)
-// Args:
+// vincenty法(逆解法)を用いて、地点1と地点2の楕円体上の距離[m]を求めます。
+// 地点1は緯度lat1、経度lon1で表されます。
+// 地点2は緯度lat2、経度lon2で表されます。
+// ただし、計算に失敗した場合は、パニックが発生します。
 //
-//	lat1(float64): 地点1の緯度（10進法）
-//	lon1(float64): 地点1の経度（10進法）
-//	lat2(float64): 地点2の緯度（10進法）
-//	lon2(float64): 地点2の経度（10進法）
-//
-// Returns:
-//
-//	float64: 2点間の楕円体上の距離(計算に失敗した場合はNone) [単位:m]
-//
-// Notes:
+// 参照)
 //
 //	https://ja.wikipedia.org/wiki/Vincenty法
 //	https://vldb.gsi.go.jp/sokuchi/surveycalc/surveycalc/bl2stf.html
-func vincenty_inverse(lat1 float64, lon1 float64, lat2 float64, lon2 float64) float64 {
+func vincentyInverse(lat1 float64, lon1 float64, lat2 float64, lon2 float64) float64 {
 	// 反復計算の上限回数
 	const ITERATION_LIMIT = 10000
 
@@ -96,10 +89,10 @@ func vincenty_inverse(lat1 float64, lon1 float64, lat2 float64, lon2 float64) fl
 	ƒ := 1 / 298.257222101 // 扁平率(GRS80)
 	b := (1 - ƒ) * a
 
-	p1 := degree_to_rad(lat1) // φ1
-	p2 := degree_to_rad(lat2) // φ2
-	r1 := degree_to_rad(lon1) // λ1
-	r2 := degree_to_rad(lon2) // λ2
+	p1 := degreeToRad(lat1) // φ1
+	p2 := degreeToRad(lat2) // φ2
+	r1 := degreeToRad(lon1) // λ1
+	r2 := degreeToRad(lon2) // λ2
 
 	// 更成緯度(補助球上の緯度)
 	U1 := math.Atan((1 - ƒ) * math.Tan(p1))
@@ -157,19 +150,9 @@ func vincenty_inverse(lat1 float64, lon1 float64, lat2 float64, lon2 float64) fl
 	return s
 }
 
-// MSM4地点の重みづけ計算
-// Args:
-//
-//	distances: MSM4地点の距離のリスト
-//
-// Returns:
-//
-//	MSM4地点の重み
-//
-// Notes:
-//
-//	4地点の重みの合計は1
-func _get_weights_from_distances(distances [4]float64) [4]float64 {
+// 基準地点からの距離 distances [m]に応じて、それぞれの距離離れた地点の重みづけを計算します。
+// 全ても重みを合算すると常に1になるように計算します。
+func weightsFromDistances(distances [4]float64) [4]float64 {
 
 	weights := [4]float64{0.0, 0.0, 0.0, 0.0}
 

@@ -191,7 +191,7 @@ func _get_interpolated_msm(
 	logger.Infof("補間計算を実行します")
 
 	// 緯度経度から標高を取得
-	ele_target := get_latlon_elevation(
+	ele_target := ElevationFromLatLon(
 		lat,
 		lon,
 		mode_elevation,
@@ -200,7 +200,7 @@ func _get_interpolated_msm(
 
 	// 補間計算 リストはいずれもSW南西,SE南東,NW北西,NE北東の順
 	// 入力した緯度経度から周囲のMSMまでの距離を算出して、距離の重みづけ係数をリストで返す
-	weights := get_msm_weights(lat, lon)
+	weights := MsmWeights(lat, lon)
 
 	// 計算に必要なMSMを算出して、MSM位置の標高を探してリストで返す
 	elevations := get_msm_elevations(lat, lon, msm_elevation_master)
@@ -304,13 +304,13 @@ func _get_corrected_msm(msm *MsmData, elevation float64, ele_target float64) *Ms
 		MR := msm.MR[i]
 
 		// 気温補正
-		TMP_corr := get_corrected_TMP(TMP, ele_gap)
+		TMP_corr := CorrectTMP(TMP, ele_gap)
 
 		// 気圧補正
-		PRES_corr := get_corrected_PRES(PRES, ele_gap, TMP_corr)
+		PRES_corr := CorrectPRES(PRES, ele_gap, TMP_corr)
 
 		// 重量絶対湿度補正
-		MR_corr := get_corrected_mixing_ratio(MR, TMP_corr, PRES_corr)
+		MR_corr := CorrectMR(MR, TMP_corr, PRES_corr)
 
 		// 補正値をデータフレームに戻す
 		msm.TMP[i] = TMP_corr
@@ -335,7 +335,7 @@ func _convert_wind16(msm *MsmTarget) {
 
 	for i := 0; i < len(msm.date); i++ {
 		// 風向風速の計算
-		w_spd16, w_dir16 := get_wind16(msm.UGRD[i], msm.VGRD[i])
+		w_spd16, w_dir16 := Wind16(msm.UGRD[i], msm.VGRD[i])
 
 		// 風速(16方位)
 		msm.w_spd[i] = w_spd16

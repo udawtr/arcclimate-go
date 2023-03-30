@@ -16,9 +16,9 @@ import "math"
 //	np.ndarray: 重量絶対湿度の標高補正後のMR [g/kg(DA)]
 //
 // """
-func get_corrected_mixing_ratio(MR float64, TMP float64, PRES float64) float64 {
+func CorrectMR(MR float64, TMP float64, PRES float64) float64 {
 	//  飽和水蒸気量（重量絶対湿度） [g/kg(DA)]
-	MR_sat := get_mixing_ratio(PRES, TMP)
+	MR_sat := mixingRatio(PRES, TMP)
 
 	// 重量絶対湿度の補正
 	MR_corr := math.Min(MR, MR_sat) // 飽和水蒸気量（重量絶対湿度）を最大とする
@@ -37,15 +37,15 @@ func get_corrected_mixing_ratio(MR float64, TMP float64, PRES float64) float64 {
 //	np.ndarray: 重量絶対湿度 [g/kg(DA)]
 //
 // """
-func get_mixing_ratio(PRES float64, TMP float64) float64 {
+func mixingRatio(PRES float64, TMP float64) float64 {
 	// 絶対温度 [K]
 	T := TMP + 273.15
 
 	// 飽和水蒸気圧 [hPa]
-	eSAT := get_eSAT(T)
+	eSAT := calc_eSAT(T)
 
 	// 飽和水蒸気量 [g/m3]
-	aT := get_aT(eSAT, T)
+	aT := calc_aT(eSAT, T)
 
 	// 重量絶対湿度 [g/kg(DA)]
 	MR := aT / ((PRES / 100) / (2.87 * T))
@@ -53,7 +53,7 @@ func get_mixing_ratio(PRES float64, TMP float64) float64 {
 	return MR
 }
 
-// """Wexler-Hylandの式 飽和水蒸気圧 eSAT
+// """Wexler-Hylandの式 飽和水蒸気圧 calc_eSAT
 // Args:
 //
 //	T(np.ndarray): 絶対温度 [K]
@@ -63,7 +63,7 @@ func get_mixing_ratio(PRES float64, TMP float64) float64 {
 //	np.ndarray: 飽和水蒸気圧 [hPa]
 //
 // """
-func get_eSAT(T float64) float64 {
+func calc_eSAT(T float64) float64 {
 	return math.Exp(-5800.2206/T+
 		1.3914993-0.048640239*T+
 		0.41764768*math.Pow(10, -4)*math.Pow(T, 2)-
@@ -82,21 +82,21 @@ func get_eSAT(T float64) float64 {
 //	np.ndarray: 飽和水蒸気量 [g/m3]
 //
 // """
-func get_aT(eSAT float64, T float64) float64 {
+func calc_aT(eSAT float64, T float64) float64 {
 	return (217 * eSAT) / T
 }
 
-// """容積絶対湿度 volumetric humidity
-// Args:
-//
-//	aT(np.ndarray): 飽和水蒸気量 [g/m3]
-//	RH(np.ndarray): 相対湿度 [%]
-//
-// Returns:
-//
-//	np.ndarray: 容積絶対湿度 [g/m3]
-//
-// """
-func get_VH(aT float64, RH float64) float64 {
-	return aT * (RH / 100)
-}
+// // """容積絶対湿度 volumetric humidity
+// // Args:
+// //
+// //	aT(np.ndarray): 飽和水蒸気量 [g/m3]
+// //	RH(np.ndarray): 相対湿度 [%]
+// //
+// // Returns:
+// //
+// //	np.ndarray: 容積絶対湿度 [g/m3]
+// //
+// // """
+// func calc_VH(aT float64, RH float64) float64 {
+// 	return aT * (RH / 100)
+// }

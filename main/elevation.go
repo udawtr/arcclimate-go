@@ -25,7 +25,7 @@ import (
 //	float: 標高
 //
 // """
-func get_latlon_elevation(
+func ElevationFromLatLon(
 	lat float64,
 	lon float64,
 	mode_elevation string,
@@ -36,7 +36,7 @@ func get_latlon_elevation(
 	if mode_elevation == "mesh" {
 		// 標高補正に3次メッシュ（1㎞メッシュ）の平均標高データを使用する場合
 		// TODO : おそらく↓の lat, lon を上書きする処理は不要。
-		elevation = _get_mesh_elevation(lat, lon, mesh_elevation_master)
+		elevation = elevationFromMesh(lat, lon, mesh_elevation_master)
 
 		log.Printf("入力された緯度・経度が含まれる3次メッシュの平均標高 %fm で計算します", elevation)
 
@@ -44,13 +44,13 @@ func get_latlon_elevation(
 		// 国土地理院のAPIを使用して入力した緯度f経度位置の標高を返す
 		log.Printf("入力された緯度・経度位置の標高データを国土地理院のAPIから取得します")
 		var err error
-		elevation, err = _get_elevation_from_cyberjapandata2(lat, lon)
+		elevation, err = elevationFromCyberjapandata2(lat, lon)
 		if err == nil {
 			log.Printf("成功  標高 %fm で計算します", elevation)
 		} else {
 			// 国土地理院のAPIから標高データを取得できなかった場合の判断
 			// 標高補正に3次メッシュ（1㎞メッシュ）の平均標高データにフォールバック
-			elevation = _get_mesh_elevation(lat, lon, mesh_elevation_master)
+			elevation = elevationFromMesh(lat, lon, mesh_elevation_master)
 			log.Printf("国土地理院のAPIから標高データを取得できなかったため、\n"+
 				"入力された緯度・経度が含まれる3次メッシュの平均標高 %fm で計算します", elevation)
 		}
@@ -73,12 +73,12 @@ func get_latlon_elevation(
 //	float: 平均標高[m]
 //
 // """
-func _get_mesh_elevation(
+func elevationFromMesh(
 	lat float64,
 	lon float64,
 	mesh_elevation_master map[int]float64,
 ) float64 {
-	meshcode := get_meshcode(lat, lon)
+	meshcode := MeshCodeFromLatLon(lat, lon)
 	elevation := mesh_elevation_master[meshcode]
 	return elevation
 }
@@ -95,7 +95,7 @@ func _get_mesh_elevation(
 //
 // """
 // 国土地理院のAPI
-func _get_elevation_from_cyberjapandata2(lat float64, lon float64) (float64, error) {
+func elevationFromCyberjapandata2(lat float64, lon float64) (float64, error) {
 	cyberjapandata2_endpoint := "http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php"
 	url := fmt.Sprintf("%s?lon=%f&lat=%f&outtype=%s", cyberjapandata2_endpoint, lon, lat, "JSON")
 

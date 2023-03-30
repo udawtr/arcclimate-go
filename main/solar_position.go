@@ -146,8 +146,8 @@ func get_sun_position(lat float64,
 	//参照時刻の前1時間の太陽高度および方位角を取得する（1/10時間ずつ計算した平均値）
 	count := []float64{1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1}
 
-	J0 := 4.921                     //太陽定数[MJ/m²h] 4.921
-	dlt0 := degree_to_rad(-23.4393) //冬至の日赤緯
+	J0 := 4.921                   //太陽定数[MJ/m²h] 4.921
+	dlt0 := degreeToRad(-23.4393) //冬至の日赤緯
 
 	var h [10]float64 //hの容器
 	var A [10]float64 //Aの容器
@@ -161,32 +161,32 @@ func get_sun_position(lat float64,
 
 		n := float64(DY - 1968)
 
-		d0 := 3.71 + 0.2596*n - math.Floor((n+3)/4)                                   //近日点通過日
-		m := 360 * (nday - d0) / 365.2596                                             //平均近点離角
-		eps := 12.3901 + 0.0172*(n+m/360)                                             //近日点と冬至点の角度
-		v := m + 1.914*math.Sin(degree_to_rad(m)) + 0.02*math.Sin(degree_to_rad(2*m)) //真近点離角
-		veps := degree_to_rad(v + eps)
-		Et := (m - v) - rad_to_degree(math.Atan(0.043*math.Sin(2*veps)/(1.0-0.043*math.Cos(2*veps)))) //近時差
+		d0 := 3.71 + 0.2596*n - math.Floor((n+3)/4)                               //近日点通過日
+		m := 360 * (nday - d0) / 365.2596                                         //平均近点離角
+		eps := 12.3901 + 0.0172*(n+m/360)                                         //近日点と冬至点の角度
+		v := m + 1.914*math.Sin(degreeToRad(m)) + 0.02*math.Sin(degreeToRad(2*m)) //真近点離角
+		veps := degreeToRad(v + eps)
+		Et := (m - v) - radToDegree(math.Atan(0.043*math.Sin(2*veps)/(1.0-0.043*math.Cos(2*veps)))) //近時差
 
 		sindlt := math.Cos(veps) * math.Sin(dlt0)                  //赤緯の正弦
 		cosdlt := math.Pow(math.Abs(1.0-math.Pow(sindlt, 2)), 0.5) //赤緯の余弦
 
-		IN0 := J0 * (1 + 0.033*math.Cos(degree_to_rad(v))) //IN0 大気外法線面日射量
+		IN0 := J0 * (1 + 0.033*math.Cos(degreeToRad(v))) //IN0 大気外法線面日射量
 
-		lons := 135.0                //標準時の地点の経度
-		latrad := degree_to_rad(lat) //緯度
+		lons := 135.0              //標準時の地点の経度
+		latrad := degreeToRad(lat) //緯度
 
 		for idx, j := range count {
 			tm := float64(Tm) - j
 			t := 15*(tm-12) + (lon - lons) + Et //時角
-			trad := degree_to_rad(t)
+			trad := degreeToRad(t)
 			Sinh := math.Sin(latrad)*sindlt + math.Cos(latrad)*cosdlt*math.Cos(trad) //太陽高度角の正弦
 			Cosh := math.Sqrt(1 - math.Pow(Sinh, 2))
 			SinA := cosdlt * math.Sin(trad) / Cosh
 			CosA := (Sinh*math.Sin(latrad) - sindlt) / (Cosh * math.Cos(latrad))
 
-			h[idx] = rad_to_degree(math.Asin(Sinh))
-			A[idx] = rad_to_degree(math.Atan2(SinA, CosA) + math.Pi)
+			h[idx] = radToDegree(math.Asin(Sinh))
+			A[idx] = radToDegree(math.Atan2(SinA, CosA) + math.Pi)
 		}
 
 		//太陽高度
@@ -197,7 +197,7 @@ func get_sun_position(lat float64,
 		h_avg /= 10
 
 		//太陽高度角のサイン
-		Sinh := math.Sin(degree_to_rad(h_avg))
+		Sinh := math.Sin(degreeToRad(h_avg))
 
 		//太陽方位角
 		var A_avg float64
@@ -991,7 +991,7 @@ func get_DN_perez_core(G_mj [3]float64,
 		ZENITH[i] = 90.0 - h_deg[i]
 
 		//1時間前、対象時刻、1時間後のデータを計算
-		cz[i] = math.Cos(degree_to_rad(ZENITH[i]))
+		cz[i] = math.Cos(degreeToRad(ZENITH[i]))
 
 		CZ[i] = math.Max(cz[i], 6.5/100)
 

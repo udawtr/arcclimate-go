@@ -32,9 +32,9 @@ type MsmData struct {
 //直散分離に関するモジュール
 
 type AAA struct {
-	SH float64
-	DN float64
-	DT float64
+	SH float64 //水平面天空日射量
+	DN float64 //法線面直達日射量
+	DT float64 //露点温度
 }
 
 // 推定結果データ
@@ -65,9 +65,6 @@ type MsmTarget struct {
 
 	//計算対象時刻の露点温度(℃)
 	DT []float64
-
-	has_DSWRF_est bool
-	has_DSWRF_msm bool
 
 	//直散分離
 	AAA_est []AAA
@@ -145,6 +142,8 @@ func interpolate(
 			APCP01:    msm.APCP01[start_index:end_index],
 			RH:        msm.RH[start_index:end_index],
 			Pw:        msm.Pw[start_index:end_index],
+			DT:        msm.DT[start_index:end_index],
+			NR:        msm.NR[start_index:end_index],
 			w_spd:     msm.w_spd[start_index:end_index],
 			w_dir:     msm.w_dir[start_index:end_index],
 		}
@@ -774,9 +773,68 @@ func main() {
 	// 保存
 	var buf *bytes.Buffer = bytes.NewBuffer([]byte{})
 	if *format == "CSV" {
-		buf.WriteString("date,TMP,MR,DSWRF_est,DSWRF_msm,Ld,VGRD,UGRD,PRES,APCP01,RH,Pw,w_spd,w_dir\n")
+		//Write Header
+		buf.WriteString("date")
+		buf.WriteString(",TMP")
+		buf.WriteString(",MR")
+		if df_save.DSWRF_est != nil {
+			buf.WriteString(",DSWRF_est")
+		}
+		if df_save.DSWRF_msm != nil {
+			buf.WriteString(",DSWRF_msm")
+		}
+		buf.WriteString(",Ld")
+		buf.WriteString(",VGRD")
+		buf.WriteString(",UGRD")
+		buf.WriteString(",PRES")
+		buf.WriteString(",APCP01")
+		buf.WriteString(",RH")
+		buf.WriteString(",Pw")
+		if df_save.DT != nil {
+			buf.WriteString(",DT")
+		}
+		// buf.WriteString(",DN_est")
+		// buf.WriteString(",SH_est")
+		// buf.WriteString(",DN_msm")
+		// buf.WriteString(",SH_msm")
+		if df_save.NR != nil {
+			buf.WriteString(",NR")
+		}
+		buf.WriteString(",w_spd")
+		buf.WriteString(",w_dir")
+		buf.WriteString("\n")
+
+		//Write Data
+		writeFloat := func(v float64) {
+			buf.WriteString(",")
+			buf.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
+		}
 		for i := 0; i < len(df_save.date); i++ {
-			buf.WriteString(fmt.Sprintf("%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", df_save.date[i].Format("2006-01-02 15:04:05"), df_save.TMP[i], df_save.MR[i], df_save.DSWRF_est[i], df_save.DSWRF_msm[i], df_save.Ld[i], df_save.VGRD[i], df_save.UGRD[i], df_save.PRES[i], df_save.APCP01[i], df_save.RH[i], df_save.Pw[i], df_save.w_spd[i], df_save.w_dir[i]))
+			buf.WriteString(df_save.date[i].Format("2006-01-02 15:04:05"))
+			writeFloat(df_save.TMP[i])
+			writeFloat(df_save.MR[i])
+			if df_save.DSWRF_est != nil {
+				writeFloat(df_save.DSWRF_est[i])
+			}
+			if df_save.DSWRF_msm != nil {
+				writeFloat(df_save.DSWRF_msm[i])
+			}
+			writeFloat(df_save.Ld[i])
+			writeFloat(df_save.VGRD[i])
+			writeFloat(df_save.UGRD[i])
+			writeFloat(df_save.PRES[i])
+			writeFloat(df_save.APCP01[i])
+			writeFloat(df_save.RH[i])
+			writeFloat(df_save.Pw[i])
+			if df_save.DT != nil {
+				writeFloat(df_save.DT[i])
+			}
+			if df_save.NR != nil {
+				writeFloat(df_save.NR[i])
+			}
+			writeFloat(df_save.w_spd[i])
+			writeFloat(df_save.w_dir[i])
+			buf.WriteString("\n")
 		}
 		// // u,v軸のベクトル風データのフィルタ
 		// if !vector_wind {

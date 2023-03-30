@@ -25,10 +25,10 @@ func get_separate(msm_target *MsmTarget,
 	solpos := get_sun_position(lat, lon, msm_target.date)
 
 	//2種の日射量データについて繰り返し
-	if msm_target.has_DSWRF_est {
+	if msm_target.DSWRF_est != nil {
 		msm_target.AAA_est = get_separate_core(msm_target, ele_target, mode_separation, msm_target.DSWRF_est, solpos)
 	}
-	if msm_target.has_DSWRF_msm {
+	if msm_target.DSWRF_msm != nil {
 		msm_target.AAA_msm = get_separate_core(msm_target, ele_target, mode_separation, msm_target.DSWRF_msm, solpos)
 	}
 }

@@ -1,3 +1,4 @@
+// ArcClimate
 package main
 
 import (
@@ -29,8 +30,7 @@ type MsmData struct {
 	APCP01    []float64   //参照時刻の前1時間の降水量の積算値 (単位:mm/h)
 }
 
-//直散分離に関するモジュール
-
+// 直散分離に関するデータ
 type AAA struct {
 	SH float64 //水平面天空日射量
 	DN float64 //法線面直達日射量
@@ -71,6 +71,21 @@ type MsmTarget struct {
 	AAA_msm []AAA
 }
 
+// 緯度lat,経度lonで表される推計対象地点の周囲のMSMデータを利用して空間補間計算を行います。
+// 出力する気象データの期間は開始年start_yearから終了年end_yearまでです。
+//
+//	msm_elevation_master(pd.DataFrame):  MSM地点の標高データ
+//	mesh_elevation_master(pd.DataFrame): 3次メッシュの標高データ
+//	msms(Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]): 4地点のMSMデータ
+//	mode_elevation(str, Optional): 'mesh':標高補正に3次メッシュ（1㎞メッシュ）の平均標高データを使用する
+//	                     'api':国土地理院のAPIを使用する
+//	mode(str, Optional): "normal"=補正のみ
+//	                     "EA"=拡張アメダス方式に準じた標準年データを作成する (funcault value = 'api')
+//	use_est(bool, Optional): 標準年データの検討に日射量の推計値を使用する（使用しない場合2018年以降のデータのみで作成） (funcault value = True)
+//
+// Returns:
+//
+//	pd.DataFrame: MSMデータフレーム
 func interpolate(
 	lat float64,
 	lon float64,
@@ -83,25 +98,6 @@ func interpolate(
 	mode string,
 	use_est bool,
 	mode_separate string) *MsmTarget {
-	// """対象地点の周囲のMSMデータを利用して空間補間計算を行う
-
-	// Args:
-	//   lat(float): 推計対象地点の緯度（10進法）
-	//   lon(float): 推計対象地点の経度（10進法）
-	//   start_year(int): 出力する気象データの開始年（標準年データの検討期間も兼ねる）
-	//   end_year(int): 出力する気象データの終了年（標準年データの検討期間も兼ねる）
-	//   msm_elevation_master(pd.DataFrame):  MSM地点の標高データ
-	//   mesh_elevation_master(pd.DataFrame): 3次メッシュの標高データ
-	//   msms(Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]): 4地点のMSMデータ
-	//   mode_elevation(str, Optional): 'mesh':標高補正に3次メッシュ（1㎞メッシュ）の平均標高データを使用する
-	//                        'api':国土地理院のAPIを使用する
-	//   mode(str, Optional): "normal"=補正のみ
-	//                        "EA"=拡張アメダス方式に準じた標準年データを作成する (funcault value = 'api')
-	//   use_est(bool, Optional): 標準年データの検討に日射量の推計値を使用する（使用しない場合2018年以降のデータのみで作成） (funcault value = True)
-
-	// Returns:
-	//   pd.DataFrame: MSMデータフレーム
-	// """
 
 	// 周囲4地点のMSMデータフレームから標高補正したMSMデータフレームを作成
 	var msm *MsmTarget = _get_interpolated_msm(
@@ -167,6 +163,22 @@ func interpolate(
 	return df_save
 }
 
+// """標高補正
+// Args:
+//
+//	lat(float): 推計対象地点の緯度（10進法）
+//	lon(float): 推計対象地点の経度（10進法）
+//	msms(Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]): 4地点のMSMデータフレーム
+//	msm_elevation_master(pd.DataFrame): MSM地点の標高データマスタ
+//	mesh_elevation_master(pd.DataFrame): 3次メッシュの標高データ
+//	mode_elevation(str, Optional): 'mesh':標高補正に3次メッシュ（1㎞メッシュ）の平均標高データを使用する
+//	                               'api':国土地理院のAPIを使用する (funcault)
+//
+// Returns:
+//
+//	pd.DataFrame: 標高補正されたMSMデータフレーム
+//
+// """
 func _get_interpolated_msm(
 	lat float64,
 	lon float64,
@@ -175,20 +187,6 @@ func _get_interpolated_msm(
 	mesh_elevation_master map[int]float64,
 	mode_elevation string,
 	mode_separate string) *MsmTarget {
-	// """標高補正
-
-	// Args:
-	//   lat(float): 推計対象地点の緯度（10進法）
-	//   lon(float): 推計対象地点の経度（10進法）
-	//   msms(Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]): 4地点のMSMデータフレーム
-	//   msm_elevation_master(pd.DataFrame): MSM地点の標高データマスタ
-	//   mesh_elevation_master(pd.DataFrame): 3次メッシュの標高データ
-	//   mode_elevation(str, Optional): 'mesh':標高補正に3次メッシュ（1㎞メッシュ）の平均標高データを使用する
-	//                                  'api':国土地理院のAPIを使用する (funcault)
-
-	// Returns:
-	//   pd.DataFrame: 標高補正されたMSMデータフレーム
-	// """
 	logger := logging.GetLogger("arcclimate")
 	logger.Infof("補間計算を実行します")
 
@@ -229,22 +227,22 @@ func _get_interpolated_msm(
 	return msm_target
 }
 
+// 周囲のMSMの気象データを読み込んで標高補正し加算
+// Args:
+//
+//	msms(Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]): 4地点のMSMデータフレーム(タプル)
+//	weights(Tuple[float, float, float, float]): 4地点の重み(タプル)
+//	elevations(Tuple[float, float, float, float]): 4地点のMSM平均標高[m](タプル)
+//	ele_target: 目標地点の標高 [m]
+//
+// Returns:
+//
+//	pd.DataFrame: 標高補正により重みづけ補正されたMSMデータフレーム
 func _get_prportional_divided_msm_df(
 	msms *[4]MsmData,
 	weights [4]float64,
 	elevations [4]float64,
 	ele_target float64) *MsmTarget {
-	// """周囲のMSMの気象データを読み込んで標高補正し加算
-
-	// Args:
-	//   msms(Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]): 4地点のMSMデータフレーム(タプル)
-	//   weights(Tuple[float, float, float, float]): 4地点の重み(タプル)
-	//   elevations(Tuple[float, float, float, float]): 4地点のMSM平均標高[m](タプル)
-	//   ele_target: 目標地点の標高 [m]
-
-	// Returns:
-	//   pd.DataFrame: 標高補正により重みづけ補正されたMSMデータフレーム
-	// """
 
 	// 標高補正 (SW,SE,NW,NE)
 	msm_SW := _get_corrected_msm(&msms[0], elevations[0], ele_target)
@@ -284,17 +282,17 @@ func _get_prportional_divided_msm_df(
 	return &msm_target
 }
 
+// MSMデータフレーム内の気温、気圧、重量絶対湿度を標高補正
+// Args:
+//
+//	df_msm(pd.DataFrame): MSMデータフレーム
+//	ele(float): 平均標高 [m]
+//	elevation(float): 目標地点の標高 [m]
+//
+// Returns:
+//
+//	pd.DataFrame: 補正後のMSMデータフレーム
 func _get_corrected_msm(msm *MsmData, elevation float64, ele_target float64) *MsmData {
-	// """MSMデータフレーム内の気温、気圧、重量絶対湿度を標高補正
-
-	// Args:
-	//   df_msm(pd.DataFrame): MSMデータフレーム
-	//   ele(float): 平均標高 [m]
-	//   elevation(float): 目標地点の標高 [m]
-
-	// Returns:
-	//   pd.DataFrame: 補正後のMSMデータフレーム
-	// """
 
 	// 標高差
 	ele_gap := ele_target - elevation
@@ -326,13 +324,12 @@ func _get_corrected_msm(msm *MsmData, elevation float64, ele_target float64) *Ms
 	return msm
 }
 
+// ベクトル風速から16方位の風向風速を計算
+//
+// Args:
+//
+//	df(pd.DataFrame): MSMデータフレーム
 func _convert_wind16(msm *MsmTarget) {
-	// """ベクトル風速から16方位の風向風速を計算
-
-	// Args:
-	//   df(pd.DataFrame): MSMデータフレーム
-	// """
-
 	msm.w_spd = make([]float64, len(msm.date))
 	msm.w_dir = make([]float64, len(msm.date))
 
@@ -348,23 +345,20 @@ func _convert_wind16(msm *MsmTarget) {
 	}
 }
 
+// 大気放射量の単位をW/m2からMJ/m2に換算
+// Args:
+//
+//	df(pd.DataFrame): MSMデータフレーム
 func _convert_Ld_w_to_mj(msm_target *MsmTarget) {
-	// """大気放射量の単位をW/m2からMJ/m2に換算
-
-	// Args:
-	//   df(pd.DataFrame): MSMデータフレーム
-	// """
-
 	for i := 0; i < len(msm_target.date); i++ {
 		msm_target.Ld[i] = msm_target.Ld[i] * (3.6 / 1000)
 	}
 }
 
+// 夜間放射量[MJ/m2]の計算
+// Args:
+// df(pd.DataFrame): MSMデータフレーム
 func _get_Nocturnal_Radiation(msm_target *MsmTarget) {
-	// """夜間放射量[MJ/m2]の計算
-	// Args:
-	// df(pd.DataFrame): MSMデータフレーム
-	// """
 
 	msm_target.NR = make([]float64, len(msm_target.date))
 
@@ -379,10 +373,10 @@ func _get_Nocturnal_Radiation(msm_target *MsmTarget) {
 	}
 }
 
+// 相対湿度、飽和水蒸気圧、露点温度の計算
+//
+//	msm(pd.DataFrame): MSMデータフレーム
 func _get_relative_humidity(msm_target *MsmTarget) {
-	// """相対湿度、飽和水蒸気圧、露点温度の計算
-	//   msm(pd.DataFrame): MSMデータフレーム
-	// """
 
 	msm_target.RH = make([]float64, len(msm_target.date))
 	msm_target.Pw = make([]float64, len(msm_target.date))
@@ -414,24 +408,24 @@ func _get_relative_humidity(msm_target *MsmTarget) {
 	}
 }
 
+// 初期化処理
+//
+// Args:
+//
+//	lat(float): 推計対象地点の緯度（10進法）
+//	lon(float): 推計対象地点の経度（10進法）
+//	path_MSM_ele(str): MSM地点の標高データのファイルパス
+//	path_mesh_ele(str): 3次メッシュの標高データのファイルパス
+//	msm_file_dir(str): MSMファイルの格納ディレクトリ
+//
+// Returns:
+//
+//	以下の要素を含む辞書
+//	- msm_list(list[str]): 読み込んだMSMファイルの一覧
+//	- df_msm_ele(pd.DataFrame): MSM地点の標高データ
+//	- df_mesh_ele(pd.DataFrame): 3次メッシュの標高データ
+//	- df_msm_list(list[pd.DataFrame]): 読み込んだデータフレームのリスト
 func init_arcclimate(lat float64, lon float64, path_MSM_ele string, path_mesh_ele string, msm_file_dir string) ArcclimateConf {
-	// """初期化処理
-
-	// Args:
-	//   lat(float): 推計対象地点の緯度（10進法）
-	//   lon(float): 推計対象地点の経度（10進法）
-	//   path_MSM_ele(str): MSM地点の標高データのファイルパス
-	//   path_mesh_ele(str): 3次メッシュの標高データのファイルパス
-	//   msm_file_dir(str): MSMファイルの格納ディレクトリ
-
-	// Returns:
-	//   以下の要素を含む辞書
-	//   - msm_list(list[str]): 読み込んだMSMファイルの一覧
-	//   - df_msm_ele(pd.DataFrame): MSM地点の標高データ
-	//   - df_mesh_ele(pd.DataFrame): 3次メッシュの標高データ
-	//   - df_msm_list(list[pd.DataFrame]): 読み込んだデータフレームのリスト
-	// """
-
 	// ロガーの作成
 	logger := logging.GetLogger("arcclimate")
 
@@ -530,18 +524,19 @@ type ArcclimateConf struct {
 	DfMsmList []MsmData
 }
 
+// """HASP形式への変換
+// Args:
+//
+//	df(pd.DataFrame): MSMデータフレーム
+//	out(io.StringIO): 出力先のテキストストリーム
+//
+// Note:
+//
+//	法線面直達日射量、水平面天空日射量、水平面夜間日射量は0を出力します。
+//	曜日の祝日判定を行っていません。
+//
+// """
 func to_has(df *MsmTarget, out *bytes.Buffer) {
-	// """HASP形式への変換
-
-	// Args:
-	//   df(pd.DataFrame): MSMデータフレーム
-	//   out(io.StringIO): 出力先のテキストストリーム
-
-	// Note:
-	//   法線面直達日射量、水平面天空日射量、水平面夜間日射量は0を出力します。
-	//   曜日の祝日判定を行っていません。
-	// """
-
 	for d := 0; d < 365; d++ {
 		off := d * 24
 
@@ -602,20 +597,22 @@ func to_has(df *MsmTarget, out *bytes.Buffer) {
 	}
 }
 
+// """初期化処理
+// Args:
+//
+//	df(pd.DataFrame): MSMデータフレーム
+//	out(io.StringIO): 出力先のテキストストリーム
+//	lat(float): 推計対象地点の緯度（10進法）
+//	lon(float): 推計対象地点の経度（10進法）
+//
+// Note:
+//
+//	"EnergyPlus Auxilary Programs"を参考に記述されました。
+//	外気温(単位:℃)、風向(単位:°)、風速(単位:m/s)、降水量の積算値(単位:mm/h)のみを出力します。
+//	それ以外の値については、"missing"に該当する値を出力します。
+//
+// """
 func to_epw(msm *MsmTarget, out *bytes.Buffer, lat float64, lon float64) {
-	// """初期化処理
-
-	// Args:
-	//   df(pd.DataFrame): MSMデータフレーム
-	//   out(io.StringIO): 出力先のテキストストリーム
-	//   lat(float): 推計対象地点の緯度（10進法）
-	//   lon(float): 推計対象地点の経度（10進法）
-
-	// Note:
-	//   "EnergyPlus Auxilary Programs"を参考に記述されました。
-	//   外気温(単位:℃)、風向(単位:°)、風速(単位:m/s)、降水量の積算値(単位:mm/h)のみを出力します。
-	//   それ以外の値については、"missing"に該当する値を出力します。
-	// """
 
 	// LOCATION
 	// 国名,緯度,経度,タイムゾーンのみ出力

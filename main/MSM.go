@@ -40,18 +40,20 @@ func get_MSM(lat float64, lon float64) (int, int, int, int) {
 	return MSM_S, MSM_N, MSM_W, MSM_E
 }
 
+// """MSMファイルを読み込みます。必要に応じてダウンロードを行います。
+// Args:
+//
+//	lat(float64): 推計対象地点の緯度（10進法）
+//	lon(float64): 推計対象地点の経度（10進法）
+//	msm_file_dir(str): MSMファイルの格納ディレクトリ
+//
+// Returns:
+//
+//	msm_list(list[str]): 読み込んだMSMファイルの一覧
+//	df_msm_list(list[pd.DataFrame]): 読み込んだデータフレームのリスト
+//
+// """
 func load_msm_files(lat float64, lon float64, msm_file_dir string) ([]string, []MsmData) {
-	// """MSMファイルを読み込みます。必要に応じてダウンロードを行います。
-
-	// Args:
-	//   lat(float64): 推計対象地点の緯度（10進法）
-	//   lon(float64): 推計対象地点の経度（10進法）
-	//   msm_file_dir(str): MSMファイルの格納ディレクトリ
-
-	// Returns:
-	//   msm_list(list[str]): 読み込んだMSMファイルの一覧
-	//   df_msm_list(list[pd.DataFrame]): 読み込んだデータフレームのリスト
-	// """
 	// 計算に必要なMSMを算出して、ダウンロード⇒ファイルpathをリストで返す
 
 	// 保存先ディレクトリの作成
@@ -162,13 +164,14 @@ func load_msm(index int, msm_file_dir string, msm string, c chan MsmAndIndex) {
 	c <- MsmAndIndex{index, df_msm}
 }
 
+// """MSMファイルのダウンロード
+// Args:
+//
+//	msm_list(Iterable[str]): ダウンロードするMSM名 ex)159-338
+//	output_dir(str): ダウンロード先ディレクトリ名 ex) ./msm/
+//
+// """
 func download_msm_files(msm_list []string, output_dir string) error {
-	// """MSMファイルのダウンロード
-
-	// Args:
-	//   msm_list(Iterable[str]): ダウンロードするMSM名 ex)159-338
-	//   output_dir(str): ダウンロード先ディレクトリ名 ex) ./msm/
-	// """
 
 	// ダウンロード元URL
 	dl_url := "https://s3.us-west-1.wasabisys.com/arcclimate/msm_2011_2020/"
@@ -222,16 +225,18 @@ func download_msm_files(msm_list []string, output_dir string) error {
 	return nil
 }
 
+// """存在しないMSMファイルの一覧を取得
+// Args:
+//
+//	msm_list(Iterable[str]): MSM名一覧
+//	msm_file_dir(str): MSMファイルの格納ディレクトリ
+//
+// Returns:
+//
+//	不足しているMSM名一覧
+//
+// """
 func get_missing_msm(msm_list []string, msm_file_dir string) []string {
-	// """存在しないMSMファイルの一覧を取得
-
-	// Args:
-	//   msm_list(Iterable[str]): MSM名一覧
-	//   msm_file_dir(str): MSMファイルの格納ディレクトリ
-
-	// Returns:
-	//   不足しているMSM名一覧
-	// """
 
 	missing_list := make([]string, 0)
 
@@ -251,16 +256,18 @@ func fileExists(path string) bool {
 	return !os.IsNotExist(err)
 }
 
+// """必要なMSMファイル名の一覧を取得
+// Args:
+//
+//	lat(float64): 推計対象地点の緯度（10進法）
+//	lon(float64): 推計対象地点の経度（10進法）
+//
+// Returns:
+//
+//	Tuple[str, str, str, str]: 隣接する4地点のMSMファイル名のタプル
+//
+// """
 func get_msm_requirements(lat float64, lon float64) []string {
-	// """必要なMSMファイル名の一覧を取得
-
-	// Args:
-	//   lat(float64): 推計対象地点の緯度（10進法）
-	//   lon(float64): 推計対象地点の経度（10進法）
-
-	// Returns:
-	//   Tuple[str, str, str, str]: 隣接する4地点のMSMファイル名のタプル
-	// """
 	MSM_S, MSM_N, MSM_W, MSM_E := get_MSM(lat, lon)
 
 	// 周囲4地点のメッシュ地点番号
@@ -272,17 +279,19 @@ func get_msm_requirements(lat float64, lon float64) []string {
 	return []string{MSM_SW, MSM_SE, MSM_NW, MSM_NE}
 }
 
+// """計算に必要なMSMを算出して、MSM位置の標高を探してタプルで返す
+// Args:
+//
+//	lat: 推計対象地点の緯度（10進法）
+//	lon: 推計対象地点の経度（10進法）
+//	msm_elevation_master: MSM地点の標高データ [m]
+//
+// Returns:
+//
+//	Tuple[float64, float64, float64, float64]: 4地点の標高をタプルで返します(SW, SE, NW, NE)
+//
+// """
 func get_msm_elevations(lat float64, lon float64, msm_elevation_master [][]float64) [4]float64 {
-	// """計算に必要なMSMを算出して、MSM位置の標高を探してタプルで返す
-
-	// Args:
-	//   lat: 推計対象地点の緯度（10進法）
-	//   lon: 推計対象地点の経度（10進法）
-	//   msm_elevation_master: MSM地点の標高データ [m]
-
-	// Returns:
-	//   Tuple[float64, float64, float64, float64]: 4地点の標高をタプルで返します(SW, SE, NW, NE)
-	// """
 
 	MSM_S, MSM_N, MSM_W, MSM_E := get_MSM(lat, lon)
 

@@ -5,21 +5,25 @@ import (
 	"time"
 )
 
+// """直散分離を行い、水平面全天日射量から法線面直達日射量および水平天空日射量を取得する
+// Args:
+//
+//	msm_target(pd.DataFrame): MSMデータフレーム
+//	lat(float64): 推計対象地点の緯度（10進法）
+//	lon(float64): 推計対象地点の経度（10進法）
+//	ele_target(float64): 推計対象地点の標高（m）
+//	mode_separation(str): 直散分離手法
+//
+// Returns:
+//
+//	pd.DataFrame: 直散分離後のデータを追加したデータフレーム
+//
+// """
 func get_separate(msm_target *MsmTarget,
 	lat float64,
 	lon float64,
 	ele_target float64,
 	mode_separation string) {
-	// """直散分離を行い、水平面全天日射量から法線面直達日射量および水平天空日射量を取得する
-	// Args:
-	//   msm_target(pd.DataFrame): MSMデータフレーム
-	//   lat(float64): 推計対象地点の緯度（10進法）
-	//   lon(float64): 推計対象地点の経度（10進法）
-	//   ele_target(float64): 推計対象地点の標高（m）
-	//   mode_separation(str): 直散分離手法
-	// Returns:
-	//   pd.DataFrame: 直散分離後のデータを追加したデータフレーム
-	// """
 
 	//時刻データから太陽位置を計算
 	solpos := get_sun_position(lat, lon, msm_target.date)
@@ -119,23 +123,25 @@ func get_separate_core(msm_target *MsmTarget,
 	return AAA_x
 }
 
+// """緯度経度と日時データから太陽位置および大気外法線面日射量の計算を行う
+// Args:
+//
+//	lat(float64): 推計対象地点の緯度（10進法）
+//	lon(float64): 推計対象地点の経度（10進法）
+//	date(pd.Series): 計算対象の時刻データ
+//
+// Returns:
+//
+//	pd.DataFrame: 大気外法線面日射量、太陽高度角および方位角のデータフレーム
+//	              df[IN0:大気外法線面日射量,
+//	                 h:太陽高度角,
+//	                 Sinh:太陽高度角のサイン,
+//	                 A:太陽方位角]
+//
+// """
 func get_sun_position(lat float64,
 	lon float64,
 	date []time.Time) []SunPositionRecord {
-	// """緯度経度と日時データから太陽位置および大気外法線面日射量の計算を行う
-
-	// Args:
-	//   lat(float64): 推計対象地点の緯度（10進法）
-	//   lon(float64): 推計対象地点の経度（10進法）
-	//   date(pd.Series): 計算対象の時刻データ
-
-	// Returns:
-	//   pd.DataFrame: 大気外法線面日射量、太陽高度角および方位角のデータフレーム
-	//                 df[IN0:大気外法線面日射量,
-	//                    h:太陽高度角,
-	//                    Sinh:太陽高度角のサイン,
-	//                    A:太陽方位角]
-	// """
 
 	//参照時刻の前1時間の太陽高度および方位角を取得する（1/10時間ずつ計算した平均値）
 	count := []float64{1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1}
@@ -230,18 +236,18 @@ type SunPositionRecord struct {
 	A    float64 //太陽方位角(1時間平均)
 }
 
+// """天空日射量SHの収束計算のループ
+// Args:
+//
+//	TH(ndarray[float64]): 水平面全天日射量(MJ/m2)
+//	Sinh(ndarray[float64]): 太陽高度角のサイン(-)
+//	IN0(ndarray[float64]): 大気外法線面日射量(MJ/m2)
+//	method_SH(func): 天空日射量の推計式
+//
+// Returns:
+//
+//	SH(ndarray[float64]): 水平面天空日射量(MJ/m2)
 func get_SH(TH []float64, Sinh []float64, IN0 []float64, method_SH func(float64, float64, float64) float64) []float64 {
-	// """天空日射量SHの収束計算のループ
-
-	// Args:
-	//   TH(ndarray[float64]): 水平面全天日射量(MJ/m2)
-	//   Sinh(ndarray[float64]): 太陽高度角のサイン(-)
-	//   IN0(ndarray[float64]): 大気外法線面日射量(MJ/m2)
-	//   method_SH(func): 天空日射量の推計式
-
-	// Returns:
-	//   SH(ndarray[float64]): 水平面天空日射量(MJ/m2)
-	// """
 	//アウトプット用のリストを作成
 	dataL := len(TH)
 	SH := make([]float64, dataL)
@@ -264,23 +270,26 @@ func get_SH(TH []float64, Sinh []float64, IN0 []float64, method_SH func(float64,
 	return SH
 }
 
+// """天空日射量SHの収束計算のコア
+//
+//	収束した大気透過率Pにおける天空日射量を取得する
+//
+// Args:
+//
+//	TH(float64): 水平面全天日射量(MJ/m2)
+//	Sinh(float64): 太陽高度角のサイン(-)
+//	IN0(float64): 大気外法線面日射量(MJ/m2)
+//	function_SH: 天空日射量の推計式
+//
+// Returns:
+//
+//	SH(float64): 水平面天空日射量(MJ/m2)
+//
+// """
 func get_SH_core(TH float64,
 	Sinh float64,
 	IN0 float64,
 	method_SH func(float64, float64, float64) float64) float64 {
-	// """天空日射量SHの収束計算のコア
-	//    収束した大気透過率Pにおける天空日射量を取得する
-
-	// Args:
-	//   TH(float64): 水平面全天日射量(MJ/m2)
-	//   Sinh(float64): 太陽高度角のサイン(-)
-	//   IN0(float64): 大気外法線面日射量(MJ/m2)
-	//   function_SH: 天空日射量の推計式
-
-	// Returns:
-	//   SH(float64): 水平面天空日射量(MJ/m2)
-	// """
-
 	const LIMIT1 = 1e-5  //THとTH0の差がこの値以下になったらPを返す
 	const LIMIT2 = 1e-10 //a(下限値)とb(上限値)の差がこの値以下になったら収束しないものとみなしてmath.NaN()を返す
 
@@ -321,52 +330,60 @@ func get_SH_core(TH float64,
 	}
 }
 
+// """水平面全天日射量の式
+// Args:
+//
+//	P(float64): 大気透過率(-)
+//	IN0(float64): 大気外法線面日射量(MJ/m2)
+//	Sinh(float64): 太陽高度角のサイン(-)
+//	SH(float64): 水平面天空日射量(MJ/m2)
+//
+// Returns:
+//
+//	TH(float64)): 水平面全天日射量(MJ/m2)
+//
+// """
 func func_TH(P float64,
 	IN0 float64,
 	Sinh float64,
 	SH float64) float64 {
-	// """水平面全天日射量の式
-	// Args:
-	//   P(float64): 大気透過率(-)
-	//   IN0(float64): 大気外法線面日射量(MJ/m2)
-	//   Sinh(float64): 太陽高度角のサイン(-)
-	//   SH(float64): 水平面天空日射量(MJ/m2)
-
-	// Returns:
-	//   TH(float64)): 水平面全天日射量(MJ/m2)
-	// """
 	return IN0*math.Pow(P, (1/Sinh))*Sinh + SH
 }
 
 // SHの予測 Nagataモデル
+// """天空日射量の推計式 Nagataモデル
+// Args:
+//   P(float64): 大気透過率(-)
+//   IN0(float64): 大気外法線面日射量(MJ/m2)
+//   Sinh(float64): 太陽高度角のサイン(-)
+
+// Returns:
+//
+//	TH(float64)): 水平面全天日射量(MJ/m2)
+//
+// """
 func func_SH_Nagata(P float64,
 	IN0 float64,
 	Sinh float64) float64 {
-	// """天空日射量の推計式 Nagataモデル
-	// Args:
-	//   P(float64): 大気透過率(-)
-	//   IN0(float64): 大気外法線面日射量(MJ/m2)
-	//   Sinh(float64): 太陽高度角のサイン(-)
-
-	// Returns:
-	//   TH(float64)): 水平面全天日射量(MJ/m2)
-	// """
 	return IN0 * Sinh * (1.0 - math.Pow(P, 1/Sinh)) * (0.66 - 0.32*Sinh) * (0.5 + (0.4-0.3*P)*Sinh)
 }
 
 // SHの予測 Watanabeモデル
+// """天空日射量の推計式 Watanabeモデル
+// Args:
+//
+//	P(float64): 大気透過率(-)
+//	IN0(float64): 大気外法線面日射量(MJ/m2)
+//	Sinh(float64): 太陽高度角のサイン(-)
+//
+// Returns:
+//
+//	TH(float64)): 水平面全天日射量(MJ/m2)
+//
+// """
 func func_SH_Watanabe(P float64,
 	IN0 float64,
 	Sinh float64) float64 {
-	// """天空日射量の推計式 Watanabeモデル
-	// Args:
-	//   P(float64): 大気透過率(-)
-	//   IN0(float64): 大気外法線面日射量(MJ/m2)
-	//   Sinh(float64): 太陽高度角のサイン(-)
-
-	// Returns:
-	//   TH(float64)): 水平面全天日射量(MJ/m2)
-	// """
 
 	if P >= 1.0 { //Watanabe式の場合Pが1以上の時エラーとなる
 		P = 1.0
@@ -377,35 +394,40 @@ func func_SH_Watanabe(P float64,
 }
 
 // SHからDNを計算する
+// """法線面直達日射量の式
+// Args:
+//
+//	TH(float64): 水平面全天日射量(MJ/m2)
+//	SH(float64): 水平面天空日射量(MJ/m2)
+//	Sinh(float64): 太陽高度角のサイン(-)
+//
+// Returns:
+//
+//	DN(float64)): 法線面直達日射量(MJ/m2)
+//
+// """
 func func_DN(TH float64,
 	SH float64,
 	Sinh float64) float64 {
-	// """法線面直達日射量の式
-	// Args:
-	//   TH(float64): 水平面全天日射量(MJ/m2)
-	//   SH(float64): 水平面天空日射量(MJ/m2)
-	//   Sinh(float64): 太陽高度角のサイン(-)
-
-	// Returns:
-	//   DN(float64)): 法線面直達日射量(MJ/m2)
-	// """
 	return (TH - SH) / Sinh
 }
 
 // SHの予測 Erbsモデル
+// """天空日射量の計算ループ Erbsモデル
+// Args:
+//
+//	TH(ndarray[float64]): 水平面全天日射量(MJ/m2)
+//	IN0(ndarray[float64]): 大気外法線面日射量(MJ/m2)
+//	Sinh(ndarray[float64]): 太陽高度角のサイン(-)
+//
+// Returns:
+//
+//	SH(ndarray[float64]): 水平面天空日射量(MJ/m2)
+//
+// """
 func get_SH_Erbs(TH []float64,
 	IN0 []float64,
 	Sinh []float64) []float64 {
-	// """天空日射量の計算ループ Erbsモデル
-
-	// Args:
-	//   TH(ndarray[float64]): 水平面全天日射量(MJ/m2)
-	//   IN0(ndarray[float64]): 大気外法線面日射量(MJ/m2)
-	//   Sinh(ndarray[float64]): 太陽高度角のサイン(-)
-
-	// Returns:
-	//   SH(ndarray[float64]): 水平面天空日射量(MJ/m2)
-	// """
 
 	//アウトプット用のリストを作成
 	dataL := len(TH)
@@ -441,73 +463,86 @@ func get_SH_Erbs(TH []float64,
 	return SH
 }
 
+// """天空日射量の推計式 Erbsモデル 1次式（KTが0.22以下）
+// Args:
+//
+//	TH(float64): 水平面全天日射量(MJ/m2)
+//	KT(float64): 晴天指数(-)
+//
+// Returns:
+//
+//	SH(float64)): 水平面天空日射量(MJ/m2)
+//
+// """
 func func_SH_Erbs_1d_022(TH float64,
 	KT float64) float64 {
-	// """天空日射量の推計式 Erbsモデル 1次式（KTが0.22以下）
-	// Args:
-	//   TH(float64): 水平面全天日射量(MJ/m2)
-	//   KT(float64): 晴天指数(-)
-
-	// Returns:
-	//   SH(float64)): 水平面天空日射量(MJ/m2)
-	// """
 	return TH * (1.0 - 0.09*KT)
 }
 
+// """天空日射量の推計式 Erbsモデル 4次式（KTが0.22を超えて0.80以下）
+// Args:
+//
+//	TH(float64): 水平面全天日射量(MJ/m2)
+//	KT(float64): 晴天指数(-)
+//
+// Returns:
+//
+//	SH(float64)): 水平面天空日射量(MJ/m2)
+//
+// """
 func func_SH_Erbs_4d(TH float64,
 	KT float64) float64 {
-	// """天空日射量の推計式 Erbsモデル 4次式（KTが0.22を超えて0.80以下）
-	// Args:
-	//   TH(float64): 水平面全天日射量(MJ/m2)
-	//   KT(float64): 晴天指数(-)
-
-	// Returns:
-	//   SH(float64)): 水平面天空日射量(MJ/m2)
-	// """
 	return TH * (0.9511 - 0.1604*KT + 4.388*math.Pow(KT, 2) - 16.638*math.Pow(KT, 3) + 12.336*math.Pow(KT, 4))
 }
 
+// """天空日射量の推計式 Erbsモデル 1次式（KTが0.80を超える）
+// Args:
+//
+//	TH(float64): 水平面全天日射量(MJ/m2)
+//
+// Returns:
+//
+//	SH(float64)): 水平面天空日射量(MJ/m2)
+//
+// """
 func func_SH_Erbs_1d_080(TH float64) float64 {
-	// """天空日射量の推計式 Erbsモデル 1次式（KTが0.80を超える）
-	// Args:
-	//   TH(float64): 水平面全天日射量(MJ/m2)
-
-	// Returns:
-	//   SH(float64)): 水平面天空日射量(MJ/m2)
-	// """
 	return 0.165 * TH
 }
 
+// """晴天指数の計算式
+// Args:
+//
+//	TH(float64): 水平面全天日射量(MJ/m2)
+//	IN0(float64): 大気外法線面日射量(MJ/m2)
+//	Sinh(float64): 太陽高度角のサイン(-)
+//
+// Returns:
+//
+//	KT(float64): 晴天指数(-)
+//
+// """
 func func_KT(TH float64,
 	IN0 float64,
 	Sinh float64) float64 {
-	// """晴天指数の計算式
-
-	// Args:
-	//   TH(float64): 水平面全天日射量(MJ/m2)
-	//   IN0(float64): 大気外法線面日射量(MJ/m2)
-	//   Sinh(float64): 太陽高度角のサイン(-)
-
-	// Returns:
-	//   KT(float64): 晴天指数(-)
-	// """
 	return TH / (IN0 * Sinh)
 }
 
 // DNの予測 Udagawa モデル
+// """直達日射量の計算ループ Udagawaモデル
+// Args:
+//
+//	TH(ndarray[float64]): 水平面全天日射量(MJ/m2)
+//	IN0(ndarray[float64]): 大気外法線面日射量(MJ/m2)
+//	Sinh(ndarray[float64]): 太陽高度角のサイン(-)
+//
+// Returns:
+//
+//	DN(ndarray[float64]): 法線面直達日射量(MJ/m2)
+//
+// """
 func get_DN_Udagawa(TH []float64,
 	IN0 []float64,
 	Sinh []float64) []float64 {
-	// """直達日射量の計算ループ Udagawaモデル
-
-	// Args:
-	//   TH(ndarray[float64]): 水平面全天日射量(MJ/m2)
-	//   IN0(ndarray[float64]): 大気外法線面日射量(MJ/m2)
-	//   Sinh(ndarray[float64]): 太陽高度角のサイン(-)
-
-	// Returns:
-	//   DN(ndarray[float64]): 法線面直達日射量(MJ/m2)
-	// """
 
 	//アウトプット用のリストを作成
 	dataL := len(TH)
@@ -550,55 +585,65 @@ func get_DN_Udagawa(TH []float64,
 	return DN
 }
 
+// """直達日射量の推計式 Udagawaモデル 3次式
+// Args:
+//
+//	IN0(float64): 大気外法線面日射量(MJ/m2)
+//	Sinh(float64): 太陽高度角のサイン(-)
+//	KT(float64): 晴天指数(-)
+//
+// Returns:
+//
+//	DN(float64): 法線面直達日射量(MJ/m2)
+//
+// """
 func func_DN_Udagawa_3d(IN0 float64,
 	Sinh float64,
 	KT float64) float64 {
-	// """直達日射量の推計式 Udagawaモデル 3次式
-	// Args:
-	//   IN0(float64): 大気外法線面日射量(MJ/m2)
-	//   Sinh(float64): 太陽高度角のサイン(-)
-	//   KT(float64): 晴天指数(-)
-	// Returns:
-	//   DN(float64): 法線面直達日射量(MJ/m2)
-	// """
 	return IN0 * (2.277 - 1.258*Sinh + 0.2396*math.Pow(Sinh, 2)) * math.Pow(KT, 3)
 }
 
+// """直達日射量の推計式 Udagawaモデル 1次式
+// Args:
+//
+//	IN0(float64): 大気外法線面日射量(MJ/m2)
+//	KT(float64): 晴天指数(-)
+//
+// Returns:
+//
+//	DN(float64): 法線面直達日射量(MJ/m2)
+//
+// """
 func func_DN_Udagawa_1d(IN0 float64, KT float64) float64 {
-	// """直達日射量の推計式 Udagawaモデル 1次式
-
-	// Args:
-	//   IN0(float64): 大気外法線面日射量(MJ/m2)
-	//   KT(float64): 晴天指数(-)
-
-	// Returns:
-	//   DN(float64): 法線面直達日射量(MJ/m2)
-	// """
 	return IN0 * (-0.43 + 1.43*KT)
 }
 
+// """法線面直達日射量の式
+// Args:
+//
+//	TH(float64): 水平面全天日射量(MJ/m2)
+//	DN(float64)): 法線面直達日射量(MJ/m2)
+//	Sinh(float64): 太陽高度角のサイン(-)
+//
+// Returns:
+//
+//	SH(float64): 水平面天空日射量(MJ/m2)
+//
+// """
 func func_SH(TH float64,
 	DN float64,
 	Sinh float64) float64 {
-	// """法線面直達日射量の式
-	// Args:
-	//   TH(float64): 水平面全天日射量(MJ/m2)
-	//   DN(float64)): 法線面直達日射量(MJ/m2)
-	//   Sinh(float64): 太陽高度角のサイン(-)
-
-	// Returns:
-	//   SH(float64): 水平面天空日射量(MJ/m2)
-	// """
 	return TH - (DN * Sinh)
 }
 
+// """Pertzの係数CMをndarrayとして取得する
+// Args:
+// Returns:
+//
+//	CM(ndarray[float64]):Pertzの係数CM
+//
+// """
 func get_CM() [1260]float64 {
-	// """Pertzの係数CMをndarrayとして取得する
-	// Args:
-
-	// Returns:
-	//     CM(ndarray[float64]):Pertzの係数CM
-	// """
 	//pythonは0オリジンのため全て-1
 	CM := [...]float64{0.385230, 0.385230, 0.385230, 0.462880, 0.317440, //1_1 => 0_0
 		0.338390, 0.338390, 0.221270, 0.316730, 0.503650,
@@ -857,25 +902,31 @@ func get_CM() [1260]float64 {
 	//return np.array(CM, dtype=float64).reshape((6,6,7,5))
 }
 
+// """単位換算　W/m2 => MJ/m2・h
+// Args:
+//
+//	W(float64):日射量等(W/m2)
+//
+// Returns:
+//
+//	MJ(float64):日射量等(MJ/m2・h)
+//
+// """
 func W_to_MJ(W float64) float64 {
-	// """単位換算　W/m2 => MJ/m2・h
-	// Args:
-	//     W(float64):日射量等(W/m2)
-
-	// Returns:
-	//     MJ(float64):日射量等(MJ/m2・h)
-	// """
 	return W * 3600 / 1000000
 }
 
+// """単位換算　MJ/m2・h => W/m2
+// Args:
+//
+//	MJ(float64):日射量等(MJ/m2・h)
+//
+// Returns:
+//
+//	W(float64):日射量等(W/m2)
+//
+// """
 func MJ_to_W(MJ float64) float64 {
-	// """単位換算　MJ/m2・h => W/m2
-	// Args:
-	//     MJ(float64):日射量等(MJ/m2・h)
-
-	// Returns:
-	//     W(float64):日射量等(W/m2)
-	// """
 	return MJ / 3600 * 1000000
 }
 

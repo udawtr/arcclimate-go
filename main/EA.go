@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-//標準年の計算モジュール
-
 // 拡張アメダス(MetDS(株)気象データシステム社)の
 // 標準年データの2010年版の作成方法を参考とした
 // ※2020年版は作成方法が変更されている
@@ -18,18 +16,21 @@ import (
 // 外皮・躯体と設備・機器の総合エネルギーシミュレーションツール
 // 「BEST」の開発(その172)30 年拡張アメダス気象データ
 // 空気調和・衛生工学会大会 学術講演論文集 2016.5 (0), 13-16, 2016
-
+//
+// """標準年の計算
+// Args:
+//
+//	df(pd.DataFrame): MSMデータフレーム
+//	start_year(int): 標準年データの検討開始年
+//	end_year(int): 標準年データの検討終了年
+//	use_est(bool): 標準年データの検討に日射量の推計値を使用する(使用しない場合2018年以降のデータのみで作成)
+//
+// Returns:
+//
+//	Tuple[pd.DataFrame, List[int]]: 標準年MSMデータフレームおよび選択された年のリストのタプル
+//
+// """
 func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*MsmTarget, []int) {
-	// """標準年の計算
-	// Args:
-	//   df(pd.DataFrame): MSMデータフレーム
-	//   start_year(int): 標準年データの検討開始年
-	//   end_year(int): 標準年データの検討終了年
-	//   use_est(bool): 標準年データの検討に日射量の推計値を使用する(使用しない場合2018年以降のデータのみで作成)
-
-	// Returns:
-	//   Tuple[pd.DataFrame, List[int]]: 標準年MSMデータフレームおよび選択された年のリストのタプル
-	// """
 
 	var df_targ MsmTarget
 
@@ -247,15 +248,17 @@ func filterMsmLeapYear29th(df_msm *MsmTarget) MsmTarget {
 	}
 }
 
+// """月偏差値,月平均,年月平均のMSMデータフレームの作成
+// Args:
+//
+//	df: MSMデータフレーム
+//
+// Returns:
+//
+//	pd.DataFrame: 月偏差値,月平均,年月平均のMSMデータフレーム
+//
+// """
 func grouping(msm *MsmTarget) map[YearMonth]GroupData0_1 {
-	// """月偏差値,月平均,年月平均のMSMデータフレームの作成
-
-	// Args:
-	//   df: MSMデータフレーム
-
-	// Returns:
-	//   pd.DataFrame: 月偏差値,月平均,年月平均のMSMデータフレーム
-	// """
 
 	//月インデックス領域確保
 	index_m := make(map[int][]int, 12)
@@ -374,19 +377,22 @@ func grouping(msm *MsmTarget) map[YearMonth]GroupData0_1 {
 	return df_temp
 }
 
+// """気象パラメータごとに決められた信頼区間に入っているかの判定
+// Args:
+//
+//	df: MSMデータフレーム
+//
+// Returns:
+//
+//	pd.DataFrame: 各項目が想定信頼区間に入っているかを真偽値で格納したデータフレーム
+//	              カラム = y,m,TMP_dev,TMP,DSWRF,MR,APCP01,w_spd
+//	               y,mは年月、TMP_devは月平均気温の分散値、その他は真偽値
+//
+// """
+// df_temp(pd.DataFrame): 気象パラメータごとの年月平均,月平均,月標準偏差
+//
+//	カラム = y,m,[TMP,VGRD,PRESS,MR_sat]*[mean_ym,mean_y,std_m]
 func get_temp_ci(msm *MsmTarget) map[YearMonth]GroupData {
-	// """気象パラメータごとに決められた信頼区間に入っているかの判定
-
-	// Args:
-	//   df: MSMデータフレーム
-	// Returns:
-	//   pd.DataFrame: 各項目が想定信頼区間に入っているかを真偽値で格納したデータフレーム
-	//                 カラム = y,m,TMP_dev,TMP,DSWRF,MR,APCP01,w_spd
-	//                  y,mは年月、TMP_devは月平均気温の分散値、その他は真偽値
-	// """
-
-	// df_temp(pd.DataFrame): 気象パラメータごとの年月平均,月平均,月標準偏差
-	//                         カラム = y,m,[TMP,VGRD,PRESS,MR_sat]*[mean_ym,mean_y,std_m]
 	var df_temp map[YearMonth]GroupData0_1 = grouping(msm)
 
 	// 気象パラメータと基準となる標準偏差(σ)の倍率

@@ -170,8 +170,8 @@ func get_sun_position(lat float64,
 		lons := 135.0                //標準時の地点の経度
 		latrad := degree_to_rad(lat) //緯度
 
-		for j := 0; j < len(count); j++ {
-			tm := float64(Tm - j)
+		for idx, j := range count {
+			tm := float64(Tm) - j
 			t := 15*(tm-12) + (lon - lons) + Et //時角
 			trad := degree_to_rad(t)
 			Sinh := math.Sin(latrad)*sindlt + math.Cos(latrad)*cosdlt*math.Cos(trad) //太陽高度角の正弦
@@ -179,8 +179,8 @@ func get_sun_position(lat float64,
 			SinA := cosdlt * math.Sin(trad) / Cosh
 			CosA := (Sinh*math.Sin(latrad) - sindlt) / (Cosh * math.Cos(latrad))
 
-			h[j] = rad_to_degree(math.Asin(Sinh))
-			A[j] = rad_to_degree(math.Atan2(SinA, CosA) + math.Pi)
+			h[idx] = rad_to_degree(math.Asin(Sinh))
+			A[idx] = rad_to_degree(math.Atan2(SinA, CosA) + math.Pi)
 		}
 
 		//太陽高度
@@ -196,7 +196,7 @@ func get_sun_position(lat float64,
 		//太陽方位角
 		var A_avg float64
 		for i := 0; i < 10; i++ {
-			A_avg += h[i]
+			A_avg += A[i]
 		}
 		A_avg /= 10
 
@@ -1018,7 +1018,7 @@ func get_DN_perez_core(G_mj [3]float64,
 		L = IndexOf(W, WBIN)
 	}
 
-	DIRMAX := BMAX * CM[I*6*7*5+J*7*5+K*6+L]
+	DIRMAX := BMAX * CM[I*6*7*5+J*7*5+K*5+L]
 
 	if DIRMAX < 0.0 {
 		DIRMAX = 0.0
@@ -1033,7 +1033,7 @@ func IndexOf(v float64, bins []float64) int {
 			return i
 		}
 	}
-	panic(v)
+	return len(bins)
 }
 
 func get_DN_perez(TH []float64, h []float64, TD []float64, ALT float64, IN0 []float64) []float64 {

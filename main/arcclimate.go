@@ -143,6 +143,8 @@ func interpolate(
 			RH:        msm.RH[start_index:end_index],
 			Pw:        msm.Pw[start_index:end_index],
 			DT:        msm.DT[start_index:end_index],
+			AAA_est:   msm.AAA_est[start_index:end_index],
+			AAA_msm:   msm.AAA_msm[start_index:end_index],
 			NR:        msm.NR[start_index:end_index],
 			w_spd:     msm.w_spd[start_index:end_index],
 			w_dir:     msm.w_dir[start_index:end_index],
@@ -793,10 +795,10 @@ func main() {
 		if df_save.DT != nil {
 			buf.WriteString(",DT")
 		}
-		// buf.WriteString(",DN_est")
-		// buf.WriteString(",SH_est")
-		// buf.WriteString(",DN_msm")
-		// buf.WriteString(",SH_msm")
+		buf.WriteString(",DN_est")
+		buf.WriteString(",SH_est")
+		buf.WriteString(",DN_msm")
+		buf.WriteString(",SH_msm")
 		if df_save.NR != nil {
 			buf.WriteString(",NR")
 		}
@@ -829,6 +831,10 @@ func main() {
 			if df_save.DT != nil {
 				writeFloat(df_save.DT[i])
 			}
+			writeFloat(df_save.AAA_est[i].DN)
+			writeFloat(df_save.AAA_est[i].SH)
+			writeFloat(df_save.AAA_msm[i].DN)
+			writeFloat(df_save.AAA_msm[i].SH)
 			if df_save.NR != nil {
 				writeFloat(df_save.NR[i])
 			}

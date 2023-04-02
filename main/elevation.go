@@ -9,22 +9,14 @@ import (
 	"net/http"
 )
 
-// """標高の取得
-// Args:
-//
-//	mode_elevation: 'mesh':標高補正に3次メッシュ（1㎞メッシュ）の平均標高データを使用する,
-//	                'api':国土地理院のAPIを使用する
-//	                (funcault value = 'api')
-//	mesh_elevation_master: 3次メッシュの標高データ (required if mode_elevation == 'mesh')
-//	                       (funcault value = None)
-//	lat: 推計対象地点の緯度（10進法）
-//	lon: 推計対象地点の経度（10進法）
-//
-// Returns:
-//
-//	float: 標高
-//
-// """
+//--------------------------------------
+// 標高
+//--------------------------------------
+
+// 緯度 lat, 経度 lonの地点の標高[m]の取得します。
+// 取得の方法 mode_elevation は、 "mesh" または "api" を指定します。
+// "mesh"の場合は、標高補正に3次メッシュ（1㎞メッシュ）の平均標高データ mesh_elevation_master を使用します。
+// "api"の場合は、国土地理院のAPIを使用します。そのため、平均標高データ mesh_elevation_masterは不要です。
 func ElevationFromLatLon(
 	lat float64,
 	lon float64,
@@ -35,7 +27,6 @@ func ElevationFromLatLon(
 
 	if mode_elevation == "mesh" {
 		// 標高補正に3次メッシュ（1㎞メッシュ）の平均標高データを使用する場合
-		// TODO : おそらく↓の lat, lon を上書きする処理は不要。
 		elevation = elevationFromMesh(lat, lon, mesh_elevation_master)
 
 		log.Printf("入力された緯度・経度が含まれる3次メッシュの平均標高 %fm で計算します", elevation)
@@ -61,18 +52,7 @@ func ElevationFromLatLon(
 	return elevation
 }
 
-// """標高補正に3次メッシュ（1㎞メッシュ）の平均標高データを取得
-// Args:
-//
-//	lat(float): 推計対象地点の緯度（10進法）
-//	lon(float): 推計対象地点の経度（10進法）
-//	mesh_elevation_master(pd.DataFrame): 3次メッシュの標高データ
-//
-// Returns:
-//
-//	float: 平均標高[m]
-//
-// """
+// 3次メッシュ（1㎞メッシュ）の平均標高データ mesh_elevation_master を用いて、緯度 lat, 経度 lonの地点の標高[m]の取得します。
 func elevationFromMesh(
 	lat float64,
 	lon float64,
@@ -83,18 +63,7 @@ func elevationFromMesh(
 	return elevation
 }
 
-// """緯度・経度位置の標高データを国土地理院のAPIから取得
-// Args:
-//
-//	lat(float): 推計対象地点の緯度（10進法）
-//	lon(float): 推計対象地点の経度（10進法）
-//
-// Returns:
-//
-//	float: 緯度・経度位置の標高データ[m]
-//
-// """
-// 国土地理院のAPI
+// 国土地理院のAPI を用いて、緯度 lat, 経度 lonの地点の標高[m]の取得します。
 func elevationFromCyberjapandata2(lat float64, lon float64) (float64, error) {
 	cyberjapandata2_endpoint := "http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php"
 	url := fmt.Sprintf("%s?lon=%f&lat=%f&outtype=%s", cyberjapandata2_endpoint, lon, lat, "JSON")

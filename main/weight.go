@@ -5,17 +5,11 @@ import (
 	"math"
 )
 
-//距離の重みづけ平均の係数を算出するモジュール
+//--------------------------------------
+// 距離の重みづけ平均の係数を算出
+//--------------------------------------
 
-// MSM4地点の重みづけ計算
-// Args:
-//
-//	lat(float64): 推計対象地点の緯度（10進法）
-//	lon(float64): 推計対象地点の経度（10進法）
-//
-// Returns:
-//
-//	MSM4地点(SW,SE,NW,NE)の重みを返す
+// 推計対象地点の緯度（10進法）lat, 経度 lon から MSM4地点(SW,SE,NW,NE)の重みを返す。
 func MsmWeights(lat float64, lon float64) [4]float64 {
 
 	// 補間計算 リストはいずれもSW南西,SE南東,NW北西,NE北東の順
@@ -28,15 +22,7 @@ func MsmWeights(lat float64, lon float64) [4]float64 {
 	return weights
 }
 
-// MSM4地点と推計対象地点との距離の計算
-// Args:
-//
-//	lat(float64): 推計対象地点の緯度（10進法）
-//	lon(float64): 推計対象地点の経度（10進法）
-//
-// Returns:
-//
-//	MSM4地点と推計対象地点の距離のリスト(SW,SE,NW,NE)
+// 推計対象地点の緯度（10進法）lat, 経度 lon からMSM4地点(SW,SE,NW,NE)と推計対象地点の距離を返す。
 func latLonMsmDistances(lat float64, lon float64) [4]float64 {
 	const lat_unit = 0.05   // MSMの緯度間隔
 	const lon_unit = 0.0625 // MSMの経度間隔
@@ -65,9 +51,7 @@ func latLonMsmDistances(lat float64, lon float64) [4]float64 {
 	return [4]float64{MSM_SW, MSM_SE, MSM_NW, MSM_NE}
 }
 
-// vincenty法(逆解法)を用いて、地点1と地点2の楕円体上の距離[m]を求めます。
-// 地点1は緯度lat1、経度lon1で表されます。
-// 地点2は緯度lat2、経度lon2で表されます。
+// vincenty法(逆解法)を用いて、地点1(緯度lat1,経度lon1)と地点2(緯度lat2,経度lon2)の楕円体上の距離[m]を求めます。
 // ただし、計算に失敗した場合は、パニックが発生します。
 //
 // 参照)

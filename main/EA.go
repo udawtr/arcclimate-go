@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math"
 	"sort"
 	"time"
@@ -101,13 +100,13 @@ func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*Ms
 	//FOR TEST
 	// APCP01 にエラーがある。TMP,DSWRF,MR,APCP01,w_spdは問題なし
 	// APCP01は降水量なので、多くの場合0となり」問題が大きくなる
-	for m := 1; m <= 12; m++ {
-		for y := 2011; y <= 2020; y++ {
-			ym := YearMonth{y, m}
-			row := df_fs_ci[ym]
-			fmt.Printf("%d,%d,%t,%t,%t,%t,%t\n", y, m, row.TMP, row.DSWRF, row.MR, row.APCP01, row.w_spd)
-		}
-	}
+	// for m := 1; m <= 12; m++ {
+	// 	for y := 2011; y <= 2020; y++ {
+	// 		ym := YearMonth{y, m}
+	// 		row := df_fs_ci[ym]
+	// 		fmt.Printf("%d,%d,%t,%t,%t,%t,%t\n", y, m, row.TMP, row.DSWRF, row.MR, row.APCP01, row.w_spd)
+	// 	}
+	// }
 
 	// 信頼区間の判定結果を合成
 	df_ci := make(map[YearMonth]GroupData4, 120)
@@ -846,9 +845,7 @@ func _get_representative_years(df_ci map[YearMonth]GroupData4) []int {
 		}
 
 		// 判定指標でループ(候補が単一の年になるまで繰り返す)
-		for i, select_slice := range select_list {
-
-			fmt.Printf("%d\n", i)
+		for _, select_slice := range select_list {
 
 			_temp_index := true_index(select_slice, filter_index)
 			if len(_temp_index) == 0 {

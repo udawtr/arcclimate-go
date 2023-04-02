@@ -429,15 +429,16 @@ func init_arcclimate(lat float64, lon float64, path_MSM_ele string, path_mesh_el
 	// ロガーの作成
 	logger := logging.GetLogger("arcclimate")
 
-	// MSM地点の標高データの読込
+	// MSM地点の標高データの読込 (0.01s)
 	logger.Infof("MSM地点の標高データ読込: %s", path_MSM_ele)
 	df_msm_ele := read_msm_elevation(path_MSM_ele)
 
-	// 3次メッシュの標高データの読込
+	// 3次メッシュの標高データの読込 (0.12s)
+	//
 	logger.Infof("3次メッシュの標高データ読込: %s", path_mesh_ele)
 	df_mesh_ele := read_3d_mesh_elevation(path_mesh_ele)
 
-	// MSMファイルの読込
+	// MSMファイルの読込 (0.2s; 4 MSM from cache)
 	MSM_list, df_msm_list := load_msm_files(lat, lon, msm_file_dir)
 
 	return ArcclimateConf{
@@ -733,7 +734,7 @@ func main() {
 	// MSMフォルダの作成
 	os.MkdirAll(*msm_file_dir, os.ModePerm)
 
-	// 初期化
+	// 初期化 (0.36s)
 	conf := init_arcclimate(
 		*lat,
 		*lon,
@@ -754,7 +755,7 @@ func main() {
 		}
 	}
 
-	// 補間処理
+	// 補間処理 (0.3s)
 	df_save := interpolate(
 		*lat,
 		*lon,
@@ -767,7 +768,6 @@ func main() {
 		*mode,
 		!*disable_est,
 		*mode_separate)
-	_ = df_save
 
 	// 保存
 	var buf *bytes.Buffer = bytes.NewBuffer([]byte{})

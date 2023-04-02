@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -110,7 +109,7 @@ func vincentyInverse(lat1 float64, lon1 float64, lat2 float64, lon2 float64) flo
 		ramda = L + (1-C)*ƒ*sinA*(sigma+C*sinS*(cos2Sm+C*cosS*(-1+2*(cos2Sm*cos2Sm))))
 
 		// 偏差が.000000000001以下ならbreak
-		fmt.Printf("%.10f\t%.10f\t%.10f\n", ramda, ramada_p, ramda-ramada_p)
+		//fmt.Printf("%.10f\t%.10f\t%.10f\n", ramda, ramada_p, ramda-ramada_p)
 		if math.Abs(ramda-ramada_p) <= 1e-12 {
 			break
 		}

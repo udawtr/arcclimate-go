@@ -279,18 +279,8 @@ func get_msm_requirements(lat float64, lon float64) []string {
 	return []string{MSM_SW, MSM_SE, MSM_NW, MSM_NE}
 }
 
-// """計算に必要なMSMを算出して、MSM位置の標高を探してタプルで返す
-// Args:
-//
-//	lat: 推計対象地点の緯度（10進法）
-//	lon: 推計対象地点の経度（10進法）
-//	msm_elevation_master: MSM地点の標高データ [m]
-//
-// Returns:
-//
-//	Tuple[float64, float64, float64, float64]: 4地点の標高をタプルで返します(SW, SE, NW, NE)
-//
-// """
+// 緯度 lat, 経度 lon から計算に必要なMSMを決定し、各地点の標高を返す。
+// 各MSMファイルの標高は msm_elevation_master に格納されている値を使用する。
 func get_msm_elevations(lat float64, lon float64, msm_elevation_master [][]float64) [4]float64 {
 
 	MSM_S, MSM_N, MSM_W, MSM_E := get_MSM(lat, lon)

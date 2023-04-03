@@ -11,7 +11,7 @@ import (
 //--------------------------------------
 
 // 経度 lon, 緯度 lat からメッシュコード(1 次、2 次、3 次)を取得
-func MeshCodeFromLatLon(lat float64, lon float64) int {
+func MeshCodeFromLatLon(lat float64, lon float64) (int, int) {
 	lt := lat * 3.0 / 2.0
 	lg := lon
 	y1 := math.Floor(lt)
@@ -39,7 +39,7 @@ func MeshCodeFromLatLon(lat float64, lon float64) int {
 	code3 += int(y3) * 10
 	code3 += int(x3) * 1
 
-	return code1*10000 + code2*100 + code3
+	return code1, code2*100 + code3
 }
 
 // メッシュコード meshcode から緯度(10進数) lat, 経度(10進数) lon への変換

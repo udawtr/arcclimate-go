@@ -21,7 +21,7 @@ func ElevationFromLatLon(
 	lat float64,
 	lon float64,
 	mode_elevation string,
-	mesh_elevation_master map[int]float64) float64 {
+	mesh_elevation_master map[int]map[int]float64) float64 {
 
 	var elevation float64
 
@@ -41,6 +41,8 @@ func ElevationFromLatLon(
 		} else {
 			// 国土地理院のAPIから標高データを取得できなかった場合の判断
 			// 標高補正に3次メッシュ（1㎞メッシュ）の平均標高データにフォールバック
+			// ref: https://maps.gsi.go.jp/development/elevation_s.html
+			// ref: https://github.com/gsi-cyberjapan/elevation-php/blob/master/getelevation.php
 			elevation = elevationFromMesh(lat, lon, mesh_elevation_master)
 			log.Printf("国土地理院のAPIから標高データを取得できなかったため、\n"+
 				"入力された緯度・経度が含まれる3次メッシュの平均標高 %fm で計算します", elevation)
@@ -56,10 +58,10 @@ func ElevationFromLatLon(
 func elevationFromMesh(
 	lat float64,
 	lon float64,
-	mesh_elevation_master map[int]float64,
+	mesh_elevation_master map[int]map[int]float64,
 ) float64 {
-	meshcode := MeshCodeFromLatLon(lat, lon)
-	elevation := mesh_elevation_master[meshcode]
+	meshcode1d, meshcode23d := MeshCodeFromLatLon(lat, lon)
+	elevation := mesh_elevation_master[meshcode1d][meshcode23d]
 	return elevation
 }
 

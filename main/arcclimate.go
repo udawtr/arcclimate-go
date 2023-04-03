@@ -3,11 +3,11 @@ package main
 
 import (
 	"bytes"
+	"embed"
 	"encoding/csv"
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"time"
@@ -92,7 +92,7 @@ func interpolate(
 	start_year int,
 	end_year int,
 	msm_elevation_master [][]float64,
-	mesh_elevation_master map[int]float64,
+	mesh_elevation_master map[int]map[int]float64,
 	msms [4]MsmData,
 	mode_elevation string,
 	mode string,
@@ -184,7 +184,7 @@ func _get_interpolated_msm(
 	lon float64,
 	msms [4]MsmData,
 	msm_elevation_master [][]float64,
-	mesh_elevation_master map[int]float64,
+	mesh_elevation_master map[int]map[int]float64,
 	mode_elevation string,
 	mode_separate string) *MsmTarget {
 	logger := logging.GetLogger("arcclimate")
@@ -414,8 +414,6 @@ func _get_relative_humidity(msm_target *MsmTarget) {
 //
 //	lat(float): 推計対象地点の緯度（10進法）
 //	lon(float): 推計対象地点の経度（10進法）
-//	path_MSM_ele(str): MSM地点の標高データのファイルパス
-//	path_mesh_ele(str): 3次メッシュの標高データのファイルパス
 //	msm_file_dir(str): MSMファイルの格納ディレクトリ
 //
 // Returns:
@@ -425,18 +423,14 @@ func _get_relative_humidity(msm_target *MsmTarget) {
 //	- df_msm_ele(pd.DataFrame): MSM地点の標高データ
 //	- df_mesh_ele(pd.DataFrame): 3次メッシュの標高データ
 //	- df_msm_list(list[pd.DataFrame]): 読み込んだデータフレームのリスト
-func init_arcclimate(lat float64, lon float64, path_MSM_ele string, path_mesh_ele string, msm_file_dir string) ArcclimateConf {
-	// ロガーの作成
-	logger := logging.GetLogger("arcclimate")
+func init_arcclimate(lat float64, lon float64, msm_file_dir string) ArcclimateConf {
+	// MSM地点の標高データの読込
+	df_msm_ele := read_msm_elevation()
 
-	// MSM地点の標高データの読込 (0.01s)
-	logger.Infof("MSM地点の標高データ読込: %s", path_MSM_ele)
-	df_msm_ele := read_msm_elevation(path_MSM_ele)
-
-	// 3次メッシュの標高データの読込 (0.12s)
-	//
-	logger.Infof("3次メッシュの標高データ読込: %s", path_mesh_ele)
-	df_mesh_ele := read_3d_mesh_elevation(path_mesh_ele)
+	// 3次メッシュの標高データの読込
+	mesh1d, _ := MeshCodeFromLatLon(lat, lon)
+	df_mesh_ele := make(map[int]map[int]float64)
+	df_mesh_ele[mesh1d] = read_3d_mesh_elevation(mesh1d)
 
 	// MSMファイルの読込 (0.2s; 4 MSM from cache)
 	MSM_list, df_msm_list := load_msm_files(lat, lon, msm_file_dir)
@@ -449,16 +443,18 @@ func init_arcclimate(lat float64, lon float64, path_MSM_ele string, path_mesh_el
 	}
 }
 
-func read_msm_elevation(path_MSM_ele string) [][]float64 {
+//go:embed data/*.csv
+var f embed.FS
+
+func read_msm_elevation() [][]float64 {
 	// Open the CSV file
-	file, err := os.Open(path_MSM_ele)
+	content, err := f.ReadFile("data/MSM_elevation.csv")
 	if err != nil {
 		panic(err)
 	}
-	defer file.Close()
 
 	// Create a new CSV reader
-	reader := csv.NewReader(file)
+	reader := csv.NewReader(bytes.NewBuffer(content))
 
 	// Read all records at once
 	records, err := reader.ReadAll()
@@ -481,16 +477,15 @@ func read_msm_elevation(path_MSM_ele string) [][]float64 {
 	return elemap
 }
 
-func read_3d_mesh_elevation(path_mesh_ele string) map[int]float64 {
+func read_3d_mesh_elevation(meshcode_1d int) map[int]float64 {
 	// Open the CSV file
-	file, err := os.Open(path_mesh_ele)
+	content, err := f.ReadFile(fmt.Sprintf("data/mesh_3d_ele_%d.csv", meshcode_1d))
 	if err != nil {
 		panic(err)
 	}
-	defer file.Close()
 
 	// Create a new CSV reader
-	reader := csv.NewReader(file)
+	reader := csv.NewReader(bytes.NewBuffer(content))
 
 	// Skip a header
 	_, _ = reader.Read()
@@ -520,8 +515,8 @@ func read_3d_mesh_elevation(path_mesh_ele string) map[int]float64 {
 
 type ArcclimateConf struct {
 	MsmList   []string
-	DfMsmEle  [][]float64
-	DfMeshEle map[int]float64
+	DfMsmEle  [][]float64             //MSM4地点の平均標高を取得するため2次メッシュコードまでの標高
+	DfMeshEle map[int]map[int]float64 //ピンポイントの標高のため、3次メッシュコードまで含んだ標高
 	DfMsmList []MsmData
 }
 
@@ -738,8 +733,6 @@ func main() {
 	conf := init_arcclimate(
 		*lat,
 		*lon,
-		filepath.Join("data", "MSM_elevation.csv"),
-		filepath.Join("data", "mesh_3d_elevation.csv"),
 		*msm_file_dir)
 
 	// EA方式かつ日射量の推計値を使用しない場合に開始年が2018年以上となっているか確認

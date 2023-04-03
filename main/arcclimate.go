@@ -16,59 +16,11 @@ import (
 	"github.com/hhkbp2/go-logging"
 )
 
-// MSMファイルから読み取ったデータ
-type MsmData struct {
-	date      []time.Time //参照時刻。日本標準時JST
-	TMP       []float64   //参照時刻時点の気温の瞬時値 (単位:℃)
-	MR        []float64   //参照時刻時点の重量絶対湿度の瞬時値 (単位:g/kgDA)
-	DSWRF_est []float64   //参照時刻の前1時間の推定日射量の積算値 (単位:MJ/m2)
-	DSWRF_msm []float64   //参照時刻の前1時間の日射量の積算値 (単位:MJ/m2)
-	Ld        []float64   //参照時刻の前1時間の下向き大気放射量の積算値 (単位:MJ/m2)
-	VGRD      []float64   //南北風(V軸) (単位:m/s)
-	UGRD      []float64   //東西風(U軸) (単位:m/s)
-	PRES      []float64   //気圧 (単位:hPa)
-	APCP01    []float64   //参照時刻の前1時間の降水量の積算値 (単位:mm/h)
-}
-
 // 直散分離に関するデータ
 type AAA struct {
 	SH float64 //水平面天空日射量
 	DN float64 //法線面直達日射量
 	DT float64 //露点温度
-}
-
-// 推定結果データ
-type MsmTarget struct {
-	date []time.Time //1.参照時刻。日本標準時JST
-
-	//標高補正のみのデータ項目
-	TMP       []float64 //2.参照時刻時点の気温の瞬時値 (単位:℃)
-	MR        []float64 //3.参照時刻時点の重量絶対湿度の瞬時値 (単位:g/kgDA)
-	DSWRF_est []float64 //4.参照時刻の前1時間の推定日射量の積算値 (単位:MJ/m2)
-	DSWRF_msm []float64 //5.参照時刻の前1時間の日射量の積算値 (単位:MJ/m2)
-	Ld        []float64 //6.大気放射量 W/m2 or MJ/m2
-	VGRD      []float64 //7.南北風(V軸) (単位:m/s)
-	UGRD      []float64 //8.東西風(U軸) (単位:m/s)
-	PRES      []float64 //9.気圧 (単位:hPa)
-	APCP01    []float64 //10.参照時刻の前1時間の降水量の積算値 (単位:mm/h)
-
-	DSWRF []float64 //標準年の計算時に使用するDSWRF
-
-	//追加項目
-	w_spd []float64 //11.参照時刻時点の風速の瞬時値 (単位:m/s)
-	w_dir []float64 //12.参照時刻時点の風向の瞬時値 (単位:°)
-
-	NR []float64 //夜間放射量[MJ/m2]
-
-	RH []float64 //	float64: 相対湿度[%]
-	Pw []float64 //	float64: 水蒸気分圧 [hpa]
-
-	//計算対象時刻の露点温度(℃)
-	DT []float64
-
-	//直散分離
-	AAA_est []AAA
-	AAA_msm []AAA
 }
 
 // 緯度lat,経度lonで表される推計対象地点の周囲のMSMデータを利用して空間補間計算を行います。
@@ -110,7 +62,7 @@ func interpolate(
 		mode_separate)
 
 	// ベクトル風速から16方位の風向風速を計算
-	_convert_wind16(msm)
+	msm._convert_wind16()
 
 	var df_save *MsmTarget
 
@@ -148,14 +100,13 @@ func interpolate(
 
 	} else if mode == "EA" {
 		// 標準年の計算
-		df_save, _ = calc_EA(
-			msm,
+		df_save, _ = msm.calc_EA(
 			start_year,
 			end_year,
 			use_est)
 
 		// ベクトル風速から16方位の風向風速を再計算
-		_convert_wind16(df_save)
+		df_save._convert_wind16()
 	} else {
 		panic(mode)
 	}
@@ -213,16 +164,16 @@ func _get_interpolated_msm(
 		ele_target)
 
 	// 相対湿度・飽和水蒸気圧・露点温度の計算
-	_get_relative_humidity(msm_target)
+	msm_target._get_relative_humidity()
 
 	// 水平面全天日射量の直散分離
 	get_separate(msm_target, lat, lon, ele_target, mode_separate)
 
 	// 大気放射量の単位をMJ/m2に換算
-	_convert_Ld_w_to_mj(msm_target)
+	msm_target._convert_Ld_w_to_mj()
 
 	// 夜間放射量の計算
-	_get_Nocturnal_Radiation(msm_target)
+	msm_target._get_Nocturnal_Radiation()
 
 	return msm_target
 }
@@ -245,10 +196,10 @@ func _get_prportional_divided_msm_df(
 	ele_target float64) *MsmTarget {
 
 	// 標高補正 (SW,SE,NW,NE)
-	msm_SW := _get_corrected_msm(&msms[0], elevations[0], ele_target)
-	msm_SE := _get_corrected_msm(&msms[1], elevations[1], ele_target)
-	msm_NW := _get_corrected_msm(&msms[2], elevations[2], ele_target)
-	msm_NE := _get_corrected_msm(&msms[3], elevations[3], ele_target)
+	msm_SW := msms[0]._get_corrected_msm(elevations[0], ele_target)
+	msm_SE := msms[1]._get_corrected_msm(elevations[1], ele_target)
+	msm_NW := msms[2]._get_corrected_msm(elevations[2], ele_target)
+	msm_NE := msms[3]._get_corrected_msm(elevations[3], ele_target)
 
 	// 重みづけによる按分
 	l := len(msm_SW.date)
@@ -292,7 +243,7 @@ func _get_prportional_divided_msm_df(
 // Returns:
 //
 //	pd.DataFrame: 補正後のMSMデータフレーム
-func _get_corrected_msm(msm *MsmData, elevation float64, ele_target float64) *MsmData {
+func (msm *MsmData) _get_corrected_msm(elevation float64, ele_target float64) *MsmData {
 
 	// 標高差
 	ele_gap := ele_target - elevation
@@ -329,7 +280,7 @@ func _get_corrected_msm(msm *MsmData, elevation float64, ele_target float64) *Ms
 // Args:
 //
 //	df(pd.DataFrame): MSMデータフレーム
-func _convert_wind16(msm *MsmTarget) {
+func (msm *MsmTarget) _convert_wind16() {
 	msm.w_spd = make([]float64, len(msm.date))
 	msm.w_dir = make([]float64, len(msm.date))
 
@@ -349,7 +300,7 @@ func _convert_wind16(msm *MsmTarget) {
 // Args:
 //
 //	df(pd.DataFrame): MSMデータフレーム
-func _convert_Ld_w_to_mj(msm_target *MsmTarget) {
+func (msm_target *MsmTarget) _convert_Ld_w_to_mj() {
 	for i := 0; i < len(msm_target.date); i++ {
 		msm_target.Ld[i] = msm_target.Ld[i] * (3.6 / 1000)
 	}
@@ -358,7 +309,7 @@ func _convert_Ld_w_to_mj(msm_target *MsmTarget) {
 // 夜間放射量[MJ/m2]の計算
 // Args:
 // df(pd.DataFrame): MSMデータフレーム
-func _get_Nocturnal_Radiation(msm_target *MsmTarget) {
+func (msm_target *MsmTarget) _get_Nocturnal_Radiation() {
 
 	msm_target.NR = make([]float64, len(msm_target.date))
 
@@ -376,7 +327,7 @@ func _get_Nocturnal_Radiation(msm_target *MsmTarget) {
 // 相対湿度、飽和水蒸気圧、露点温度の計算
 //
 //	msm(pd.DataFrame): MSMデータフレーム
-func _get_relative_humidity(msm_target *MsmTarget) {
+func (msm_target *MsmTarget) _get_relative_humidity() {
 
 	msm_target.RH = make([]float64, len(msm_target.date))
 	msm_target.Pw = make([]float64, len(msm_target.date))
@@ -520,142 +471,6 @@ type ArcclimateConf struct {
 	DfMsmList []MsmData
 }
 
-// """HASP形式への変換
-// Args:
-//
-//	df(pd.DataFrame): MSMデータフレーム
-//	out(io.StringIO): 出力先のテキストストリーム
-//
-// Note:
-//
-//	法線面直達日射量、水平面天空日射量、水平面夜間日射量は0を出力します。
-//	曜日の祝日判定を行っていません。
-//
-// """
-func to_has(df *MsmTarget, out *bytes.Buffer) {
-	for d := 0; d < 365; d++ {
-		off := d * 24
-
-		// 年,月,日,曜日
-		year := df.date[off].Year() % 100
-		month := df.date[off].Month()
-		day := df.date[off].Day()
-		weekday := df.date[off].Weekday() + 2 // 月2,...,日8
-		if weekday == 8 {                     // 日=>1
-			weekday = 1
-		}
-		// 注)祝日は処理していない
-
-		// 2列	2列	2列	1列
-		// 年	月	日	曜日
-		day_signature := fmt.Sprintf("%2d%2d%2d%1d", year, month, day, weekday)
-
-		// 外気温 (×0.1℃-50℃)
-		for h := 0; h < 24; h++ {
-			TMP := int(df.TMP[off+h]*10) + 50
-			out.Write([]byte(fmt.Sprintf("%3d", TMP)))
-		}
-		out.Write([]byte(fmt.Sprintf("%s1\n", day_signature)))
-
-		// 絶対湿度 (0.1g/kg(DA))
-		for h := 0; h < 24; h++ {
-			MR := int(df.MR[off+h] * 10)
-			out.Write([]byte(fmt.Sprintf("%3d", MR)))
-		}
-		out.Write([]byte(fmt.Sprintf("%s2\n", day_signature)))
-
-		// 日射量
-		out.Write([]byte(fmt.Sprintf("  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0%s3\n", day_signature)))
-		out.Write([]byte(fmt.Sprintf("  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0%s4\n", day_signature)))
-		out.Write([]byte(fmt.Sprintf("  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0%s5\n", day_signature)))
-
-		// 風向 (0:無風,1:NNE,...,16:N)
-		for h := 0; h < 24; h++ {
-			w_dir := int(df.w_dir[off+h]/22.5) + 1
-			if w_dir == 0 {
-				// 真北の場合を0から16へ変更
-				w_dir = 16
-			}
-			if df.w_spd[off+h] == 0 {
-				w_dir = 0 // 無風の場合は0
-			}
-
-			out.Write([]byte(fmt.Sprintf("%3d", w_dir)))
-		}
-		out.Write([]byte(fmt.Sprintf("%s6\n", day_signature)))
-
-		// 風速 (0.1m/s)
-		for h := 0; h < 24; h++ {
-			w_spd := int(df.w_dir[off+h] * 10)
-			out.Write([]byte(fmt.Sprintf("%3d", w_spd)))
-		}
-		out.Write([]byte(fmt.Sprintf("%s7\n", day_signature)))
-	}
-}
-
-// """初期化処理
-// Args:
-//
-//	df(pd.DataFrame): MSMデータフレーム
-//	out(io.StringIO): 出力先のテキストストリーム
-//	lat(float): 推計対象地点の緯度（10進法）
-//	lon(float): 推計対象地点の経度（10進法）
-//
-// Note:
-//
-//	"EnergyPlus Auxilary Programs"を参考に記述されました。
-//	外気温(単位:℃)、風向(単位:°)、風速(単位:m/s)、降水量の積算値(単位:mm/h)のみを出力します。
-//	それ以外の値については、"missing"に該当する値を出力します。
-//
-// """
-func to_epw(msm *MsmTarget, out *bytes.Buffer, lat float64, lon float64) {
-
-	// LOCATION
-	// 国名,緯度,経度,タイムゾーンのみ出力
-	out.Write([]byte(fmt.Sprintf("LOCATION,-,-,JPN,-,-,%.2f,%.2f,9.0,0.0\n", lat, lon)))
-
-	// DESIGN CONDITION
-	// 設計条件なし
-	out.Write([]byte("DESIGN CONDITIONS,0\n"))
-
-	// TYPICAL/EXTREME PERIODS
-	// 期間指定なし
-	out.Write([]byte("TYPICAL/EXTREME PERIODS,0\n"))
-
-	// GROUND TEMPERATURES
-	// 地中温度無し
-	out.Write([]byte("GROUND TEMPERATURES,0\n"))
-
-	// HOLIDAYS/DAYLIGHT SAVINGS
-	// 休日/サマータイム
-	out.Write([]byte("HOLIDAYS/DAYLIGHT SAVINGS,No,0,0,0\n"))
-
-	// COMMENT 1
-	out.Write([]byte("COMMENTS 1\n"))
-
-	// COMMENT 2
-	out.Write([]byte("COMMENTS 2\n"))
-
-	// DATA HEADER
-	out.Write([]byte("DATA PERIODS,1,1,Data,Sunday,1/1,12/31\n"))
-
-	for i := 0; i < len(msm.date); i++ {
-		// N1: 年
-		// N2: 月
-		// N3: 日
-		// N4: 時
-		// N5: 分 = 0
-		// N6: Dry Bulb Temperature
-		// N7-N19: missing
-		// N20: w_dir
-		// N21: w_spd
-		// N22-N32: missing
-		// N33: APCP01
-		// N34: missing
-		out.Write([]byte(fmt.Sprintf("%d,%d,%d,%d,60,-,%.1f,99.9,999,999999,999,9999,9999,9999,9999,9999,999999,999999,999999,9999,%d,%.1f,99,99,9999,99999,9,999999999,999,0.999,999,99,999,%.1f,99\n", msm.date[i].Year(), msm.date[i].Month(), msm.date[i].Day(), msm.date[i].Hour()+1, msm.TMP[i], int(msm.w_dir[i]), msm.w_spd[i], msm.APCP01[i])))
-	}
-}
-
 func main() {
 	// コマンドライン引数の処理
 	parser := argparse.NewParser("ArcClimate", "Creates a design meteorological data set for any specified point")
@@ -765,82 +580,11 @@ func main() {
 	// 保存
 	var buf *bytes.Buffer = bytes.NewBuffer([]byte{})
 	if *format == "CSV" {
-		//Write Header
-		buf.WriteString("date")
-		buf.WriteString(",TMP")
-		buf.WriteString(",MR")
-		if df_save.DSWRF_est != nil {
-			buf.WriteString(",DSWRF_est")
-		}
-		if df_save.DSWRF_msm != nil {
-			buf.WriteString(",DSWRF_msm")
-		}
-		buf.WriteString(",Ld")
-		buf.WriteString(",VGRD")
-		buf.WriteString(",UGRD")
-		buf.WriteString(",PRES")
-		buf.WriteString(",APCP01")
-		buf.WriteString(",RH")
-		buf.WriteString(",Pw")
-		if df_save.DT != nil {
-			buf.WriteString(",DT")
-		}
-		buf.WriteString(",DN_est")
-		buf.WriteString(",SH_est")
-		buf.WriteString(",DN_msm")
-		buf.WriteString(",SH_msm")
-		if df_save.NR != nil {
-			buf.WriteString(",NR")
-		}
-		buf.WriteString(",w_spd")
-		buf.WriteString(",w_dir")
-		buf.WriteString("\n")
-
-		//Write Data
-		writeFloat := func(v float64) {
-			buf.WriteString(",")
-			buf.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
-		}
-		for i := 0; i < len(df_save.date); i++ {
-			buf.WriteString(df_save.date[i].Format("2006-01-02 15:04:05"))
-			writeFloat(df_save.TMP[i])
-			writeFloat(df_save.MR[i])
-			if df_save.DSWRF_est != nil {
-				writeFloat(df_save.DSWRF_est[i])
-			}
-			if df_save.DSWRF_msm != nil {
-				writeFloat(df_save.DSWRF_msm[i])
-			}
-			writeFloat(df_save.Ld[i])
-			writeFloat(df_save.VGRD[i])
-			writeFloat(df_save.UGRD[i])
-			writeFloat(df_save.PRES[i])
-			writeFloat(df_save.APCP01[i])
-			writeFloat(df_save.RH[i])
-			writeFloat(df_save.Pw[i])
-			if df_save.DT != nil {
-				writeFloat(df_save.DT[i])
-			}
-			writeFloat(df_save.AAA_est[i].DN)
-			writeFloat(df_save.AAA_est[i].SH)
-			writeFloat(df_save.AAA_msm[i].DN)
-			writeFloat(df_save.AAA_msm[i].SH)
-			if df_save.NR != nil {
-				writeFloat(df_save.NR[i])
-			}
-			writeFloat(df_save.w_spd[i])
-			writeFloat(df_save.w_dir[i])
-			buf.WriteString("\n")
-		}
-		// // u,v軸のベクトル風データのフィルタ
-		// if !vector_wind {
-		// 	// df_save.drop(['VGRD', 'UGRD'], axis=1, inplace=True)
-		// }
-		// df_save.to_csv(out, line_terminator='\n')
+		df_save.to_csv(buf)
 	} else if *format == "EPW" {
-		to_epw(df_save, buf, *lat, *lon)
+		df_save.to_epw(buf, *lat, *lon)
 	} else if *format == "HAS" {
-		to_has(df_save, buf)
+		df_save.to_has(buf)
 	}
 
 	if *filename == "" {

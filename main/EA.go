@@ -29,7 +29,7 @@ import (
 //	Tuple[pd.DataFrame, List[int]]: 標準年MSMデータフレームおよび選択された年のリストのタプル
 //
 // """
-func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*MsmTarget, []int) {
+func (df_msm *MsmTarget) calc_EA(start_year int, end_year int, use_est bool) (*MsmTarget, []int) {
 
 	var df_targ MsmTarget
 
@@ -41,7 +41,7 @@ func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*Ms
 		local, _ := time.LoadLocation("Local")
 		start_time := time.Date(start_year, 1, 1, 0, 0, 0, 0, local)
 		end_time := time.Date(end_year, 12, 31, 23, 0, 0, 0, local)
-		df_targ = exctactMsm(df_msm, start_time, end_time)
+		df_targ = df_msm.ExctactMsm(start_time, end_time)
 
 		// TODO: drop, rename処理はcopyの後の方がよさそう
 
@@ -57,7 +57,7 @@ func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*Ms
 		local, _ := time.LoadLocation("Local")
 		start_time := time.Date(start_year, 1, 1, 0, 0, 0, 0, local)
 		end_time := time.Date(end_year, 12, 31, 23, 0, 0, 0, local)
-		df_targ = exctactMsm(df_msm, start_time, end_time)
+		df_targ = df_msm.ExctactMsm(start_time, end_time)
 
 		// TODO: drop, rename処理はcopyの後の方がよさそう
 		// TODO: copy処理は if/elseの両方で同じに見える
@@ -84,13 +84,13 @@ func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*Ms
 	// 0    2011  01  True   True  True    True   True
 	// 1    2012  01  True   True  True    True   True
 	// 2    2013  01  True   True  True    True   True
-	df_temp_ci := get_temp_ci(&df_targ)
+	df_temp_ci := df_targ.get_temp_ci()
 
 	// df_fs : fs計算による信頼区間の判定
 	//         y   m    TMP  DSWRF     MR  APCP01  w_spd    TMP_FS
 	// 0    2011  01  False  False  False   False  False  0.076795
 	// 1    2012  01  False   True  False    True  False  0.149116
-	df_fs_ci := get_fs_ci(&df_targ)
+	df_fs_ci := df_targ.get_fs_ci()
 
 	//TEST: この時点では、df_targ.APCP01の値は正常
 	// for i := 0; i < len(df_targ.date); i++ {
@@ -130,7 +130,7 @@ func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*Ms
 	rep_years := _get_representative_years(df_ci)
 
 	// 月別に代表的な年から接合した1年間のデータを作成
-	df_patchwork := patch_representataive_years(df_msm, rep_years)
+	df_patchwork := df_msm.patch_representataive_years(rep_years)
 
 	// 接合部の円滑化
 	for _, v := range get_smoothing_months(rep_years) {
@@ -151,41 +151,7 @@ func calc_EA(df_msm *MsmTarget, start_year int, end_year int, use_est bool) (*Ms
 	return df_patchwork, rep_years
 }
 
-func exctactMsm(df_msm *MsmTarget, start_time time.Time, end_time time.Time) MsmTarget {
-	start_index := sort.Search(len(df_msm.date), func(i int) bool {
-		return df_msm.date[i].After(start_time) || df_msm.date[i].Equal(start_time)
-	})
-	end_index := sort.Search(len(df_msm.date), func(i int) bool {
-		return df_msm.date[i].After(end_time) || df_msm.date[i].Equal(end_time)
-	})
-	msm := MsmTarget{
-		date:    append([]time.Time{}, df_msm.date[start_index:end_index+1]...),
-		TMP:     append([]float64{}, df_msm.TMP[start_index:end_index+1]...),
-		MR:      append([]float64{}, df_msm.MR[start_index:end_index+1]...),
-		DSWRF:   append([]float64{}, df_msm.DSWRF[start_index:end_index+1]...),
-		Ld:      append([]float64{}, df_msm.Ld[start_index:end_index+1]...),
-		VGRD:    append([]float64{}, df_msm.VGRD[start_index:end_index+1]...),
-		UGRD:    append([]float64{}, df_msm.UGRD[start_index:end_index+1]...),
-		PRES:    append([]float64{}, df_msm.PRES[start_index:end_index+1]...),
-		APCP01:  append([]float64{}, df_msm.APCP01[start_index:end_index+1]...),
-		RH:      append([]float64{}, df_msm.RH[start_index:end_index+1]...),
-		Pw:      append([]float64{}, df_msm.Pw[start_index:end_index+1]...),
-		NR:      append([]float64{}, df_msm.NR[start_index:end_index+1]...),
-		DT:      append([]float64{}, df_msm.DT[start_index:end_index+1]...),
-		AAA_est: append([]AAA{}, df_msm.AAA_est[start_index:end_index+1]...),
-		AAA_msm: append([]AAA{}, df_msm.AAA_msm[start_index:end_index+1]...),
-	}
-	if df_msm.w_spd != nil {
-		msm.w_spd = append([]float64{}, df_msm.w_spd[start_index:end_index+1]...)
-	}
-	if df_msm.w_dir != nil {
-		msm.w_dir = append([]float64{}, df_msm.w_dir[start_index:end_index+1]...)
-	}
-
-	return msm
-}
-
-func filterMsmLeapYear29th(df_msm *MsmTarget) MsmTarget {
+func (df_msm *MsmTarget) filterMsmLeapYear29th() MsmTarget {
 	date := []time.Time{}
 	TMP := []float64{}
 	MR := []float64{}
@@ -257,7 +223,7 @@ func filterMsmLeapYear29th(df_msm *MsmTarget) MsmTarget {
 //	pd.DataFrame: 月偏差値,月平均,年月平均のMSMデータフレーム
 //
 // """
-func grouping(msm *MsmTarget) map[YearMonth]GroupData0_1 {
+func (msm *MsmTarget) grouping() map[YearMonth]GroupData0_1 {
 
 	//月インデックス領域確保
 	index_m := make(map[int][]int, 12)
@@ -391,8 +357,8 @@ func grouping(msm *MsmTarget) map[YearMonth]GroupData0_1 {
 // df_temp(pd.DataFrame): 気象パラメータごとの年月平均,月平均,月標準偏差
 //
 //	カラム = y,m,[TMP,VGRD,PRESS,MR_sat]*[mean_ym,mean_y,std_m]
-func get_temp_ci(msm *MsmTarget) map[YearMonth]GroupData {
-	var df_temp map[YearMonth]GroupData0_1 = grouping(msm)
+func (msm *MsmTarget) get_temp_ci() map[YearMonth]GroupData {
+	var df_temp map[YearMonth]GroupData0_1 = msm.grouping()
 
 	// 気象パラメータと基準となる標準偏差(σ)の倍率
 	const std_rate_TMP = 1.0
@@ -474,7 +440,7 @@ type GroupData0 struct {
 	TMP, DSWRF, MR, APCP01, w_spd float64
 }
 
-func get_fs_ci(df *MsmTarget) map[YearMonth]FSData {
+func (df *MsmTarget) get_fs_ci() map[YearMonth]FSData {
 	// """FS(Finkelstein Schafer statistics)計算
 
 	// Args:
@@ -531,11 +497,11 @@ func get_fs_ci(df *MsmTarget) map[YearMonth]FSData {
 	g_ymd_mean.w_spd_mean_ymd = getMeanForYearMonthGroupDay(df.w_spd, &g_ymd_mean)
 
 	// FS値,FS値の偏差,FS値の偏差が指定範囲内に入っているか
-	TMP_FS := make_fs(&g_ymd_mean, func(msm *GroupData2, i int) float64 { return msm.TMP_mean_ymd[i] }, std_rate_TMP)
-	DSWRF_FS := make_fs(&g_ymd_mean, func(msm *GroupData2, i int) float64 { return msm.DSWRF_mean_ymd[i] }, std_rate_DSWRF)
-	MR_FS := make_fs(&g_ymd_mean, func(msm *GroupData2, i int) float64 { return msm.MR_mean_ymd[i] }, std_rate_MR)
-	APCP01_FS := make_fs(&g_ymd_mean, func(msm *GroupData2, i int) float64 { return msm.APCP01_mean_ymd[i] }, std_rate_APCP01)
-	w_spd_FS := make_fs(&g_ymd_mean, func(msm *GroupData2, i int) float64 { return msm.w_spd_mean_ymd[i] }, std_rate_w_spd)
+	TMP_FS := g_ymd_mean.make_fs(func(msm *GroupData2, i int) float64 { return msm.TMP_mean_ymd[i] }, std_rate_TMP)
+	DSWRF_FS := g_ymd_mean.make_fs(func(msm *GroupData2, i int) float64 { return msm.DSWRF_mean_ymd[i] }, std_rate_DSWRF)
+	MR_FS := g_ymd_mean.make_fs(func(msm *GroupData2, i int) float64 { return msm.MR_mean_ymd[i] }, std_rate_MR)
+	APCP01_FS := g_ymd_mean.make_fs(func(msm *GroupData2, i int) float64 { return msm.APCP01_mean_ymd[i] }, std_rate_APCP01)
+	w_spd_FS := g_ymd_mean.make_fs(func(msm *GroupData2, i int) float64 { return msm.w_spd_mean_ymd[i] }, std_rate_w_spd)
 
 	FS := make(map[YearMonth]FSData)
 	for ym := range TMP_FS {
@@ -565,7 +531,7 @@ type GroupData2 struct {
 	TMP_mean_ymd, DSWRF_mean_ymd, MR_mean_ymd, APCP01_mean_ymd, w_spd_mean_ymd []float64
 }
 
-func make_fs(g_ymd_mean *GroupData2, key func(*GroupData2, int) float64, std_rate float64) map[YearMonth]bool {
+func (g_ymd_mean *GroupData2) make_fs(key func(*GroupData2, int) float64, std_rate float64) map[YearMonth]bool {
 	// """特定の気象パラメータに対するFS(Finkelstein Schafer statistics)計算
 
 	// Args:
@@ -577,14 +543,12 @@ func make_fs(g_ymd_mean *GroupData2, key func(*GroupData2, int) float64, std_rat
 	//   DataFrame: カラム=y,m,<key>,<key>_FS,<key>_FS_std
 	// """
 	// 月ごとの累積度数分布(CDF)の計算
-	cdf_ALL := make_cdf(
-		g_ymd_mean,
+	cdf_ALL := g_ymd_mean.make_cdf(
 		func(msm *GroupData2, i int) int { return msm.Month[i] },
 		key)
 
 	// 年月ごとの累積度数分布(CDF)の計算
-	cdf_year := make_cdf(
-		g_ymd_mean,
+	cdf_year := g_ymd_mean.make_cdf(
 		func(msm *GroupData2, i int) int { return msm.Year[i]*100 + msm.Month[i] },
 		key)
 
@@ -667,7 +631,7 @@ type YearMonthIndex struct {
 	Index       int
 }
 
-func make_cdf(g_ymd_mean *GroupData2, by func(*GroupData2, int) int, key func(*GroupData2, int) float64) []float64 {
+func (g_ymd_mean *GroupData2) make_cdf(by func(*GroupData2, int) int, key func(*GroupData2, int) float64) []float64 {
 	// """特定の気象パラメータに対するCDF計算
 	// g_ymd_mean に 名前が<key>_<suffix> のカラムを追加し、CDFを格納する。
 
@@ -911,7 +875,7 @@ func _get_representative_years(df_ci map[YearMonth]GroupData4) []int {
 	return select_year
 }
 
-func patch_representataive_years(df *MsmTarget, rep_years []int) *MsmTarget {
+func (df *MsmTarget) patch_representataive_years(rep_years []int) *MsmTarget {
 	// """標準年の作成
 	// 月別に代表的な年から接合した1年間のデータを作成します。
 
@@ -953,7 +917,7 @@ func patch_representataive_years(df *MsmTarget, rep_years []int) *MsmTarget {
 		end_date := time.Date(year, month, mdays[int(month)-1], 23, 0, 0, 0, time.Local)
 
 		// 抜き出した代表データ
-		df_temp := exctactMsm(df, start_date, end_date)
+		df_temp := df.ExctactMsm(start_date, end_date)
 
 		// 接合
 		df_EA.date = append(df_EA.date, df_temp.date...)
@@ -1067,7 +1031,7 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 		before_end := time.Date(int(before_year+1), 1, 1, 6, 0, 0, 0, time.Local)
 
 		// 前月の代表年の12月31日18時から翌年1月1日6時までのMSMデータフレーム
-		df_before = exctactMsm(df_temp, before_start, before_end)
+		df_before = df_temp.ExctactMsm(before_start, before_end)
 
 		// 対象月の代表年の前年の12月31日18時
 		after_start := time.Date(int(after_year-1), 12, 31, 18, 0, 0, 0, time.Local)
@@ -1076,7 +1040,7 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 		after_end := time.Date(int(after_year), 1, 1, 6, 0, 0, 0, time.Local)
 
 		// 対象月の代表年の前年12月31日18時から翌年1月1日6時までのMSMデータフレーム
-		df_after = exctactMsm(df_temp, after_start, after_end)
+		df_after = df_temp.ExctactMsm(after_start, after_end)
 
 		// 1970年12月31日18時-23時 および 1月1日0時-6時
 		// 1970年12月31日18時-23時
@@ -1099,7 +1063,7 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 		before_end := time.Date(before_year, 3, 1, 6, 0, 0, 0, time.Local)
 
 		// 前月の代表年における2月28日18時から3月1日6時までのMSMデータフレーム
-		df_before = exctactMsm(df_temp, before_start, before_end)
+		df_before = df_temp.ExctactMsm(before_start, before_end)
 
 		// 結合する2つの月の遅い月(対象月)の代表年における2月28日18時(はじまり)
 		after_start := time.Date(after_year, 2, 28, 18, 0, 0, 0, time.Local)
@@ -1108,11 +1072,11 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 		after_end := after.Add(time.Hour * 6)
 
 		// 対象月の代表年における2月28日18時から3月1日6時までのMSMデータフレーム
-		df_after = exctactMsm(df_temp, after_start, after_end)
+		df_after = df_temp.ExctactMsm(after_start, after_end)
 
 		// MSMデータフレームから2月29日を除外
-		df_before = filterMsmLeapYear29th(&df_before)
-		df_after = filterMsmLeapYear29th(&df_after)
+		df_before = df_before.filterMsmLeapYear29th()
+		df_after = df_after.filterMsmLeapYear29th()
 
 		// 対象月の1970年における対象月の1日の前日18時から翌日6時まで
 		for i := -6; i <= 6; i++ {
@@ -1126,7 +1090,7 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 		before_end := before.Add(time.Hour * 6)
 
 		// 前月の代表年における対象月の1日の前月末日18時から1日6時までのMSMデータフレーム
-		df_before = exctactMsm(df_temp, before_start, before_end)
+		df_before = df_temp.ExctactMsm(before_start, before_end)
 
 		// 対象月の代表年における対象月の1日の前月末日18時
 		after_start := after.Add(time.Hour * -6)
@@ -1135,7 +1099,7 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 		after_end := after.Add(time.Hour * 6)
 
 		// 対象月の代表年における対象月の1日の前月末日18時から1日6時までのMSMデータフレーム
-		df_after = exctactMsm(df_temp, after_start, after_end)
+		df_after = df_temp.ExctactMsm(after_start, after_end)
 
 		// 対象月の1970年における対象月の1日の前日18時から翌日6時まで
 		for i := -6; i <= 6; i++ {

@@ -16,32 +16,18 @@ import (
 // 「BEST」の開発(その172)30 年拡張アメダス気象データ
 // 空気調和・衛生工学会大会 学術講演論文集 2016.5 (0), 13-16, 2016
 //
-// """標準年の計算
-// Args:
-//
-//	df(pd.DataFrame): MSMデータフレーム
-//	start_year(int): 標準年データの検討開始年
-//	end_year(int): 標準年データの検討終了年
-//	use_est(bool): 標準年データの検討に日射量の推計値を使用する(使用しない場合2018年以降のデータのみで作成)
-//
-// Returns:
-//
-//	Tuple[pd.DataFrame, List[int]]: 標準年MSMデータフレームおよび選択された年のリストのタプル
-//
-// """
+// 検討開始年 start_year, 検討終了年度 end_year の中で標準年を作成する。
+// 標準年データの検討に日射量の推計値を使用するには、use_est = True とする。(使用しない場合2018年以降のデータのみで作成)
 func (df_msm *MsmTarget) calc_EA(start_year int, end_year int, use_est bool) (*MsmTarget, []int) {
 
-	var df_targ MsmTarget
+	var df_targ *MsmTarget
 
 	if use_est {
 		// * 標準年データの検討に日射量の推計値を使用する
 		//   -> `DSWRF_msm`列を削除し、`DSWRF_est`列を`DSWRF`列へ変更(推計値データを採用)
 		df_msm.DSWRF = append([]float64{}, df_msm.DSWRF_est...)
 
-		local, _ := time.LoadLocation("Local")
-		start_time := time.Date(start_year, 1, 1, 0, 0, 0, 0, local)
-		end_time := time.Date(end_year, 12, 31, 23, 0, 0, 0, local)
-		df_targ = df_msm.ExctactMsm(start_time, end_time)
+		df_targ = df_msm.ExctactMsmYear(start_year, end_year)
 
 		// TODO: drop, rename処理はcopyの後の方がよさそう
 
@@ -54,10 +40,7 @@ func (df_msm *MsmTarget) calc_EA(start_year int, end_year int, use_est bool) (*M
 			start_year = 2018
 		}
 
-		local, _ := time.LoadLocation("Local")
-		start_time := time.Date(start_year, 1, 1, 0, 0, 0, 0, local)
-		end_time := time.Date(end_year, 12, 31, 23, 0, 0, 0, local)
-		df_targ = df_msm.ExctactMsm(start_time, end_time)
+		df_targ = df_msm.ExctactMsmYear(start_year, end_year)
 
 		// TODO: drop, rename処理はcopyの後の方がよさそう
 		// TODO: copy処理は if/elseの両方で同じに見える
@@ -127,17 +110,14 @@ func (df_msm *MsmTarget) calc_EA(start_year int, end_year int, use_est bool) (*M
 	}
 
 	// 月別に代表的な年を取得
-	rep_years := _get_representative_years(df_ci)
+	rep_years := representativeYears(df_ci)
 
 	// 月別に代表的な年から接合した1年間のデータを作成
-	df_patchwork := df_msm.patch_representataive_years(rep_years)
+	df_patchwork := df_msm.patchRepresentataiveYears(rep_years)
 
 	// 接合部の円滑化
-	for _, v := range get_smoothing_months(rep_years) {
-		target := v.TargetMonth
-		before_year := v.BeforeYear
-		after_year := v.AfterYear
-		_smooth_month_gaps(target, before_year, after_year, df_msm, df_patchwork)
+	for _, v := range SmoothingMonths(rep_years) {
+		df_patchwork.smoothMonthGaps(v, df_msm)
 	}
 
 	if use_est {
@@ -149,68 +129,6 @@ func (df_msm *MsmTarget) calc_EA(start_year int, end_year int, use_est bool) (*M
 	}
 
 	return df_patchwork, rep_years
-}
-
-func (df_msm *MsmTarget) filterMsmLeapYear29th() MsmTarget {
-	date := []time.Time{}
-	TMP := []float64{}
-	MR := []float64{}
-	DSWRF := []float64{}
-	Ld := []float64{}
-	VGRD := []float64{}
-	UGRD := []float64{}
-	PRES := []float64{}
-	APCP01 := []float64{}
-	RH := []float64{}
-	Pw := []float64{}
-	NR := []float64{}
-	DT := []float64{}
-	AAA_est := []AAA{}
-	AAA_msm := []AAA{}
-	// w_spd := []float64{}
-	// w_dir := []float64{}
-
-	for i := 0; i < len(df_msm.date); i++ {
-		if !(df_msm.date[i].Month() == 2 && df_msm.date[i].Day() == 29) {
-			date = append(date, df_msm.date[i])
-			TMP = append(TMP, df_msm.TMP[i])
-			MR = append(MR, df_msm.MR[i])
-			DSWRF = append(DSWRF, df_msm.DSWRF[i])
-			Ld = append(Ld, df_msm.Ld[i])
-			VGRD = append(VGRD, df_msm.VGRD[i])
-			UGRD = append(UGRD, df_msm.UGRD[i])
-			PRES = append(PRES, df_msm.PRES[i])
-			APCP01 = append(APCP01, df_msm.APCP01[i])
-			RH = append(RH, df_msm.RH[i])
-			Pw = append(Pw, df_msm.Pw[i])
-			NR = append(NR, df_msm.NR[i])
-			DT = append(DT, df_msm.DT[i])
-			AAA_est = append(AAA_est, df_msm.AAA_est[i])
-			AAA_msm = append(AAA_msm, df_msm.AAA_msm[i])
-			// w_spd = append(w_spd, df_msm.w_dir[i])
-			// w_dir = append(w_dir, df_msm.w_dir[i])
-		}
-	}
-
-	return MsmTarget{
-		date:    date,
-		TMP:     TMP,
-		MR:      MR,
-		DSWRF:   DSWRF,
-		Ld:      Ld,
-		VGRD:    VGRD,
-		UGRD:    UGRD,
-		PRES:    PRES,
-		APCP01:  APCP01,
-		RH:      RH,
-		Pw:      Pw,
-		NR:      NR,
-		DT:      DT,
-		AAA_est: AAA_est,
-		AAA_msm: AAA_msm,
-		// w_spd:     w_spd,
-		// w_dir:     w_dir,
-	}
 }
 
 // """月偏差値,月平均,年月平均のMSMデータフレームの作成
@@ -705,7 +623,7 @@ type GroupData3 struct {
 
 // **** 代表年の決定と接合処理 ****
 
-func _get_representative_years(df_ci map[YearMonth]GroupData4) []int {
+func representativeYears(df_ci map[YearMonth]GroupData4) []int {
 	// """
 
 	// Args:
@@ -875,7 +793,7 @@ func _get_representative_years(df_ci map[YearMonth]GroupData4) []int {
 	return select_year
 }
 
-func (df *MsmTarget) patch_representataive_years(rep_years []int) *MsmTarget {
+func (df *MsmTarget) patchRepresentataiveYears(rep_years []int) *MsmTarget {
 	// """標準年の作成
 	// 月別に代表的な年から接合した1年間のデータを作成します。
 
@@ -887,21 +805,21 @@ func (df *MsmTarget) patch_representataive_years(rep_years []int) *MsmTarget {
 	//   pd.DataFrame: 標準年のMSMデータフレーム
 	// """
 	df_EA := MsmTarget{
-		date:    []time.Time{},
-		TMP:     []float64{},
-		MR:      []float64{},
-		DSWRF:   []float64{},
-		Ld:      []float64{},
-		VGRD:    []float64{},
-		UGRD:    []float64{},
-		PRES:    []float64{},
-		APCP01:  []float64{},
-		RH:      []float64{},
-		Pw:      []float64{},
-		DT:      []float64{},
-		NR:      []float64{},
-		AAA_est: []AAA{},
-		AAA_msm: []AAA{},
+		date:   []time.Time{},
+		TMP:    []float64{},
+		MR:     []float64{},
+		DSWRF:  []float64{},
+		Ld:     []float64{},
+		VGRD:   []float64{},
+		UGRD:   []float64{},
+		PRES:   []float64{},
+		APCP01: []float64{},
+		RH:     []float64{},
+		Pw:     []float64{},
+		DT:     []float64{},
+		NR:     []float64{},
+		SR_est: []SolarRadiation{},
+		SR_msm: []SolarRadiation{},
 	}
 
 	// 月日数
@@ -933,8 +851,8 @@ func (df *MsmTarget) patch_representataive_years(rep_years []int) *MsmTarget {
 		df_EA.Pw = append(df_EA.Pw, df_temp.Pw...)
 		df_EA.DT = append(df_EA.DT, df_temp.DT...)
 		df_EA.NR = append(df_EA.NR, df_temp.NR...)
-		df_EA.AAA_est = append(df_EA.AAA_est, df_temp.AAA_est...)
-		df_EA.AAA_msm = append(df_EA.AAA_msm, df_temp.AAA_msm...)
+		df_EA.SR_est = append(df_EA.SR_est, df_temp.SR_est...)
+		df_EA.SR_msm = append(df_EA.SR_msm, df_temp.SR_msm...)
 	}
 
 	for i := 0; i < len(df_EA.date); i++ {
@@ -946,7 +864,7 @@ func (df *MsmTarget) patch_representataive_years(rep_years []int) *MsmTarget {
 
 // **** 円滑化処理 ****
 
-func get_smoothing_months(rep_years []int) []SmootingMonth {
+func SmoothingMonths(rep_years []int) []SmootingMonth {
 	// """円滑化が必要な月の取得
 
 	// Args:
@@ -989,7 +907,7 @@ type SmootingMonth struct {
 	AfterYear   int
 }
 
-func _smooth_month_gaps(after_month time.Month, before_year int, after_year int, df_temp *MsmTarget, df_EA *MsmTarget) {
+func (df_EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, df_temp *MsmTarget) {
 	// """月別に代表的な年からの接合部を滑らかに加工する
 
 	// Args:
@@ -1000,6 +918,10 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 	//   df_EA(pd.DataFrame): 1年分にあらく結合したデータ
 	// """
 	// [1, 0.92, 0.83, ...., 0.0], [0.0, 0.08, 0.17, 0.25, ..., 1.0]
+
+	after_month := sm.TargetMonth
+	before_year := sm.BeforeYear
+	after_year := sm.AfterYear
 
 	// before_coef = np.linspace(1, 0, 13, endpoint=True)
 	// after_coef = np.linspace(0, 1, 13, endpoint=True)
@@ -1019,7 +941,7 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 	after := time.Date(int(after_year), after_month, 1, 0, 0, 0, 0, time.Local)
 
 	var timestamp [13]time.Time
-	var df_before, df_after MsmTarget
+	var df_before, df_after *MsmTarget
 
 	if after_month == 1 {
 		// 12月と1月の結合(年をまたぐ)
@@ -1123,8 +1045,8 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 	Pw := [13]float64{}
 	NR := [13]float64{}
 	DT := [13]float64{}
-	AAA_est := [13]AAA{}
-	AAA_msm := [13]AAA{}
+	AAA_est := [13]SolarRadiation{}
+	AAA_msm := [13]SolarRadiation{}
 	// w_spd := [13]float64{}
 	// w_dir := [13]float64{}
 
@@ -1141,15 +1063,15 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 		RH[i] = df_before.RH[i]*before_coef[i] + df_after.RH[i]*after_coef[i]
 		Pw[i] = df_before.Pw[i]*before_coef[i] + df_after.Pw[i]*after_coef[i]
 		NR[i] = df_before.NR[i]*before_coef[i] + df_after.NR[i]*after_coef[i]
-		AAA_est[i] = AAA{
-			df_before.AAA_est[i].SH*before_coef[i] + df_after.AAA_est[i].SH*after_coef[i],
-			df_before.AAA_est[i].DN*before_coef[i] + df_after.AAA_est[i].DN*after_coef[i],
-			df_before.AAA_est[i].DT*before_coef[i] + df_after.AAA_est[i].DT*after_coef[i],
+		AAA_est[i] = SolarRadiation{
+			df_before.SR_est[i].SH*before_coef[i] + df_after.SR_est[i].SH*after_coef[i],
+			df_before.SR_est[i].DN*before_coef[i] + df_after.SR_est[i].DN*after_coef[i],
+			df_before.SR_est[i].DT*before_coef[i] + df_after.SR_est[i].DT*after_coef[i],
 		}
-		AAA_msm[i] = AAA{
-			df_before.AAA_msm[i].SH*before_coef[i] + df_after.AAA_msm[i].SH*after_coef[i],
-			df_before.AAA_msm[i].DN*before_coef[i] + df_after.AAA_msm[i].DN*after_coef[i],
-			df_before.AAA_msm[i].DT*before_coef[i] + df_after.AAA_msm[i].DT*after_coef[i],
+		AAA_msm[i] = SolarRadiation{
+			df_before.SR_msm[i].SH*before_coef[i] + df_after.SR_msm[i].SH*after_coef[i],
+			df_before.SR_msm[i].DN*before_coef[i] + df_after.SR_msm[i].DN*after_coef[i],
+			df_before.SR_msm[i].DT*before_coef[i] + df_after.SR_msm[i].DT*after_coef[i],
 		}
 		DT[i] = df_before.DT[i]*before_coef[i] + df_after.DT[i]*after_coef[i]
 		// w_spd[i] = df_before.w_spd[i]*before_coef[i] + df_after.w_spd[i]*after_coef[i]
@@ -1175,8 +1097,8 @@ func _smooth_month_gaps(after_month time.Month, before_year int, after_year int,
 		df_EA.Pw[index] = Pw[i]
 		df_EA.DT[index] = DT[i]
 		df_EA.NR[index] = NR[i]
-		df_EA.AAA_est[index] = AAA_est[i]
-		df_EA.AAA_msm[index] = AAA_msm[i]
+		df_EA.SR_est[index] = AAA_est[i]
+		df_EA.SR_msm[index] = AAA_msm[i]
 		// df_EA.w_spd[index] = w_spd[i]
 		// df_EA.w_dir[index] = w_dir[i]
 	}

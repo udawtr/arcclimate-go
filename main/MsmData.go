@@ -4,6 +4,7 @@ import "time"
 
 // MSMファイルから読み取ったデータ
 type MsmData struct {
+	name      string      //ファイル名
 	date      []time.Time //参照時刻。日本標準時JST
 	TMP       []float64   //参照時刻時点の気温の瞬時値 (単位:℃)
 	MR        []float64   //参照時刻時点の重量絶対湿度の瞬時値 (単位:g/kgDA)
@@ -14,4 +15,8 @@ type MsmData struct {
 	UGRD      []float64   //東西風(U軸) (単位:m/s)
 	PRES      []float64   //気圧 (単位:hPa)
 	APCP01    []float64   //参照時刻の前1時間の降水量の積算値 (単位:mm/h)
+}
+
+type MsmDataSet struct {
+	Data [4]MsmData
 }

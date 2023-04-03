@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"sort"
 	"strconv"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 )
 
 // 直散分離に関するデータ
-type AAA struct {
+type SolarRadiation struct {
 	SH float64 //水平面天空日射量
 	DN float64 //法線面直達日射量
 	DT float64 //露点温度
@@ -38,75 +37,53 @@ type AAA struct {
 // Returns:
 //
 //	pd.DataFrame: MSMデータフレーム
-func interpolate(
+func Interpolate(
 	lat float64,
 	lon float64,
 	start_year int,
 	end_year int,
-	msm_elevation_master [][]float64,
-	mesh_elevation_master map[int]map[int]float64,
-	msms [4]MsmData,
 	mode_elevation string,
 	mode string,
 	use_est bool,
-	mode_separate string) *MsmTarget {
+	mode_separate string, msm_file_dir string) *MsmTarget {
+
+	// MSM地点の標高データの読込
+	ele2d := read_msm_elevation()
+
+	// 3次メッシュの標高データの読込
+	mesh1d, _ := MeshCodeFromLatLon(lat, lon)
+	df_mesh_ele := make(map[int]map[int]float64)
+	df_mesh_ele[mesh1d] = read_3d_mesh_elevation(mesh1d)
+	ele3d := &Elevation3d{df_mesh_ele}
+
+	// MSMファイルの読込 (0.2s; 4 MSM from cache)
+	msms := load_msm_files(lat, lon, msm_file_dir)
 
 	// 周囲4地点のMSMデータフレームから標高補正したMSMデータフレームを作成
-	var msm *MsmTarget = _get_interpolated_msm(
+	msm := PrportionalDivided(
 		lat,
 		lon,
 		msms,
-		msm_elevation_master,
-		mesh_elevation_master,
+		ele2d,
+		ele3d,
 		mode_elevation,
 		mode_separate)
 
 	// ベクトル風速から16方位の風向風速を計算
-	msm._convert_wind16()
+	msm.WindVectorToDirAndSpeed()
 
 	var df_save *MsmTarget
 
 	if mode == "normal" {
 		// 保存用に年月日をフィルタ
-		local, _ := time.LoadLocation("Local")
-		start_time := time.Date(start_year, 1, 1, 0, 0, 0, 0, local)
-		end_time := time.Date(end_year+1, 1, 1, 0, 0, 0, 0, local)
-		start_index := sort.Search(len(msm.date), func(i int) bool {
-			return msm.date[i].After(start_time) || msm.date[i].Equal(start_time)
-		})
-		end_index := sort.Search(len(msm.date), func(i int) bool {
-			return msm.date[i].After(end_time) || msm.date[i].Equal(end_time)
-		})
-		df_save = &MsmTarget{
-			date:      msm.date[start_index:end_index],
-			TMP:       msm.TMP[start_index:end_index],
-			MR:        msm.MR[start_index:end_index],
-			DSWRF_est: msm.DSWRF_est[start_index:end_index],
-			DSWRF_msm: msm.DSWRF_msm[start_index:end_index],
-			Ld:        msm.Ld[start_index:end_index],
-			VGRD:      msm.VGRD[start_index:end_index],
-			UGRD:      msm.UGRD[start_index:end_index],
-			PRES:      msm.PRES[start_index:end_index],
-			APCP01:    msm.APCP01[start_index:end_index],
-			RH:        msm.RH[start_index:end_index],
-			Pw:        msm.Pw[start_index:end_index],
-			DT:        msm.DT[start_index:end_index],
-			AAA_est:   msm.AAA_est[start_index:end_index],
-			AAA_msm:   msm.AAA_msm[start_index:end_index],
-			NR:        msm.NR[start_index:end_index],
-			w_spd:     msm.w_spd[start_index:end_index],
-			w_dir:     msm.w_dir[start_index:end_index],
-		}
+		df_save = msm.ExctactMsmYear(start_year, end_year)
 
 	} else if mode == "EA" {
 		// 標準年の計算
-		df_save, _ = msm.calc_EA(
-			start_year,
-			end_year,
-			use_est)
+		df_save, _ = msm.calc_EA(start_year, end_year, use_est)
 
 		// ベクトル風速から16方位の風向風速を再計算
-		df_save._convert_wind16()
+		df_save.WindVectorToDirAndSpeed()
 	} else {
 		panic(mode)
 	}
@@ -130,12 +107,12 @@ func interpolate(
 //	pd.DataFrame: 標高補正されたMSMデータフレーム
 //
 // """
-func _get_interpolated_msm(
+func PrportionalDivided(
 	lat float64,
 	lon float64,
-	msms [4]MsmData,
-	msm_elevation_master [][]float64,
-	mesh_elevation_master map[int]map[int]float64,
+	msms MsmDataSet,
+	elevation2d *Elevation2d,
+	elevation3d *Elevation3d,
 	mode_elevation string,
 	mode_separate string) *MsmTarget {
 	logger := logging.GetLogger("arcclimate")
@@ -146,7 +123,7 @@ func _get_interpolated_msm(
 		lat,
 		lon,
 		mode_elevation,
-		mesh_elevation_master,
+		elevation3d,
 	)
 
 	// 補間計算 リストはいずれもSW南西,SE南東,NW北西,NE北東の順
@@ -154,52 +131,38 @@ func _get_interpolated_msm(
 	weights := MsmWeights(lat, lon)
 
 	// 計算に必要なMSMを算出して、MSM位置の標高を探してリストで返す
-	elevations := get_msm_elevations(lat, lon, msm_elevation_master)
+	elevations := elevation2d.Elevations(lat, lon)
 
 	// 周囲のMSMの気象データを読み込んで標高補正後に按分する
-	msm_target := _get_prportional_divided_msm_df(
-		&msms,
-		weights,
-		elevations,
-		ele_target)
+	msm_target := msms.PrportionalDivided(weights, elevations, ele_target)
 
 	// 相対湿度・飽和水蒸気圧・露点温度の計算
-	msm_target._get_relative_humidity()
+	msm_target.RH_Pw_DT()
 
 	// 水平面全天日射量の直散分離
-	get_separate(msm_target, lat, lon, ele_target, mode_separate)
+	msm_target.SeparateSolarRadiation(lat, lon, ele_target, mode_separate)
 
 	// 大気放射量の単位をMJ/m2に換算
-	msm_target._convert_Ld_w_to_mj()
+	msm_target.ConvertLdUnit()
 
 	// 夜間放射量の計算
-	msm_target._get_Nocturnal_Radiation()
+	msm_target.CalcNocturnalRadiation()
 
 	return msm_target
 }
 
-// 周囲のMSMの気象データを読み込んで標高補正し加算
-// Args:
-//
-//	msms(Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]): 4地点のMSMデータフレーム(タプル)
-//	weights(Tuple[float, float, float, float]): 4地点の重み(タプル)
-//	elevations(Tuple[float, float, float, float]): 4地点のMSM平均標高[m](タプル)
-//	ele_target: 目標地点の標高 [m]
-//
-// Returns:
-//
-//	pd.DataFrame: 標高補正により重みづけ補正されたMSMデータフレーム
-func _get_prportional_divided_msm_df(
-	msms *[4]MsmData,
+// 周囲のMSMの気象データから目標地点(標高 ele_target [m])の気象データを作成する。
+// 按分には、目標地点と各周辺の地点の平均標高 elevations [m] と 地点間の距離から求めた重み weights を用いる。
+func (msms *MsmDataSet) PrportionalDivided(
 	weights [4]float64,
 	elevations [4]float64,
 	ele_target float64) *MsmTarget {
 
 	// 標高補正 (SW,SE,NW,NE)
-	msm_SW := msms[0]._get_corrected_msm(elevations[0], ele_target)
-	msm_SE := msms[1]._get_corrected_msm(elevations[1], ele_target)
-	msm_NW := msms[2]._get_corrected_msm(elevations[2], ele_target)
-	msm_NE := msms[3]._get_corrected_msm(elevations[3], ele_target)
+	msm_SW := msms.Data[0].CorrectedMsm_TMP_PRES_MR(elevations[0], ele_target)
+	msm_SE := msms.Data[1].CorrectedMsm_TMP_PRES_MR(elevations[1], ele_target)
+	msm_NW := msms.Data[2].CorrectedMsm_TMP_PRES_MR(elevations[2], ele_target)
+	msm_NE := msms.Data[3].CorrectedMsm_TMP_PRES_MR(elevations[3], ele_target)
 
 	// 重みづけによる按分
 	l := len(msm_SW.date)
@@ -233,17 +196,8 @@ func _get_prportional_divided_msm_df(
 	return &msm_target
 }
 
-// MSMデータフレーム内の気温、気圧、重量絶対湿度を標高補正
-// Args:
-//
-//	df_msm(pd.DataFrame): MSMデータフレーム
-//	ele(float): 平均標高 [m]
-//	elevation(float): 目標地点の標高 [m]
-//
-// Returns:
-//
-//	pd.DataFrame: 補正後のMSMデータフレーム
-func (msm *MsmData) _get_corrected_msm(elevation float64, ele_target float64) *MsmData {
+// MSMデータフレームの気温 TMP 、気圧 PRES、重量絶対湿度 MR を標高補正する(標高 elevation [m] から ele_target [m] へ補正)。
+func (msm *MsmData) CorrectedMsm_TMP_PRES_MR(elevation float64, ele_target float64) *MsmData {
 
 	// 標高差
 	ele_gap := ele_target - elevation
@@ -275,12 +229,8 @@ func (msm *MsmData) _get_corrected_msm(elevation float64, ele_target float64) *M
 	return msm
 }
 
-// ベクトル風速から16方位の風向風速を計算
-//
-// Args:
-//
-//	df(pd.DataFrame): MSMデータフレーム
-func (msm *MsmTarget) _convert_wind16() {
+// ベクトル風速 UGRD, VGRD から16方位の風向風速 w_dir, w_spd を計算
+func (msm *MsmTarget) WindVectorToDirAndSpeed() {
 	msm.w_spd = make([]float64, len(msm.date))
 	msm.w_dir = make([]float64, len(msm.date))
 
@@ -296,20 +246,15 @@ func (msm *MsmTarget) _convert_wind16() {
 	}
 }
 
-// 大気放射量の単位をW/m2からMJ/m2に換算
-// Args:
-//
-//	df(pd.DataFrame): MSMデータフレーム
-func (msm_target *MsmTarget) _convert_Ld_w_to_mj() {
+// 大気放射量 Ld の単位をW/m2からMJ/m2に換算
+func (msm_target *MsmTarget) ConvertLdUnit() {
 	for i := 0; i < len(msm_target.date); i++ {
 		msm_target.Ld[i] = msm_target.Ld[i] * (3.6 / 1000)
 	}
 }
 
-// 夜間放射量[MJ/m2]の計算
-// Args:
-// df(pd.DataFrame): MSMデータフレーム
-func (msm_target *MsmTarget) _get_Nocturnal_Radiation() {
+// 夜間放射量 NR [MJ/m2] を 気温 TMP [℃], 大気放射量 Ld [MJ/m2] から計算
+func (msm_target *MsmTarget) CalcNocturnalRadiation() {
 
 	msm_target.NR = make([]float64, len(msm_target.date))
 
@@ -324,10 +269,8 @@ func (msm_target *MsmTarget) _get_Nocturnal_Radiation() {
 	}
 }
 
-// 相対湿度、飽和水蒸気圧、露点温度の計算
-//
-//	msm(pd.DataFrame): MSMデータフレーム
-func (msm_target *MsmTarget) _get_relative_humidity() {
+// 相対湿度 RH [%]、飽和水蒸気圧 PW [hPa]、露点温度 DT [℃] の計算
+func (msm_target *MsmTarget) RH_Pw_DT() {
 
 	msm_target.RH = make([]float64, len(msm_target.date))
 	msm_target.Pw = make([]float64, len(msm_target.date))
@@ -384,12 +327,11 @@ func init_arcclimate(lat float64, lon float64, msm_file_dir string) ArcclimateCo
 	df_mesh_ele[mesh1d] = read_3d_mesh_elevation(mesh1d)
 
 	// MSMファイルの読込 (0.2s; 4 MSM from cache)
-	MSM_list, df_msm_list := load_msm_files(lat, lon, msm_file_dir)
+	df_msm_list := load_msm_files(lat, lon, msm_file_dir)
 
 	return ArcclimateConf{
-		MSM_list,
 		df_msm_ele,
-		df_mesh_ele,
+		&Elevation3d{df_mesh_ele},
 		df_msm_list,
 	}
 }
@@ -397,7 +339,7 @@ func init_arcclimate(lat float64, lon float64, msm_file_dir string) ArcclimateCo
 //go:embed data/*.csv
 var f embed.FS
 
-func read_msm_elevation() [][]float64 {
+func read_msm_elevation() *Elevation2d {
 	// Open the CSV file
 	content, err := f.ReadFile("data/MSM_elevation.csv")
 	if err != nil {
@@ -425,7 +367,7 @@ func read_msm_elevation() [][]float64 {
 		}
 	}
 
-	return elemap
+	return &Elevation2d{elemap}
 }
 
 func read_3d_mesh_elevation(meshcode_1d int) map[int]float64 {
@@ -465,10 +407,19 @@ func read_3d_mesh_elevation(meshcode_1d int) map[int]float64 {
 }
 
 type ArcclimateConf struct {
-	MsmList   []string
-	DfMsmEle  [][]float64             //MSM4地点の平均標高を取得するため2次メッシュコードまでの標高
-	DfMeshEle map[int]map[int]float64 //ピンポイントの標高のため、3次メッシュコードまで含んだ標高
-	DfMsmList []MsmData
+	DfMsmEle    *Elevation2d //MSM4地点の平均標高を取得するため2次メッシュコードまでの標高
+	Elevation3d *Elevation3d //ピンポイントの標高のため、3次メッシュコードまで含んだ標高
+	Elevation2d MsmDataSet
+}
+
+// MSM4地点の平均標高を取得するため2次メッシュコードまでの標高
+type Elevation2d struct {
+	DfMsmEle [][]float64
+}
+
+// ピンポイントの標高のため、3次メッシュコードまで含んだ標高
+type Elevation3d struct {
+	DfMeshEle map[int]map[int]float64
 }
 
 func main() {
@@ -544,12 +495,6 @@ func main() {
 	// MSMフォルダの作成
 	os.MkdirAll(*msm_file_dir, os.ModePerm)
 
-	// 初期化 (0.36s)
-	conf := init_arcclimate(
-		*lat,
-		*lon,
-		*msm_file_dir)
-
 	// EA方式かつ日射量の推計値を使用しない場合に開始年が2018年以上となっているか確認
 	if *mode == "EA" {
 		if *disable_est {
@@ -564,18 +509,15 @@ func main() {
 	}
 
 	// 補間処理 (0.3s)
-	df_save := interpolate(
+	df_save := Interpolate(
 		*lat,
 		*lon,
 		*start_year,
 		*end_year,
-		conf.DfMsmEle,
-		conf.DfMeshEle,
-		[4]MsmData(conf.DfMsmList),
 		*mode_elevation,
 		*mode,
 		!*disable_est,
-		*mode_separate)
+		*mode_separate, *msm_file_dir)
 
 	// 保存
 	var buf *bytes.Buffer = bytes.NewBuffer([]byte{})

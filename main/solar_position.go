@@ -19,7 +19,7 @@ import (
 //	pd.DataFrame: 直散分離後のデータを追加したデータフレーム
 //
 // """
-func get_separate(msm_target *MsmTarget,
+func (msm_target *MsmTarget) SeparateSolarRadiation(
 	lat float64,
 	lon float64,
 	ele_target float64,
@@ -30,21 +30,21 @@ func get_separate(msm_target *MsmTarget,
 
 	//2種の日射量データについて繰り返し
 	if msm_target.DSWRF_est != nil {
-		msm_target.AAA_est = get_separate_core(msm_target, ele_target, mode_separation, msm_target.DSWRF_est, solpos)
+		msm_target.SR_est = get_separate_core(msm_target, ele_target, mode_separation, msm_target.DSWRF_est, solpos)
 	}
 	if msm_target.DSWRF_msm != nil {
-		msm_target.AAA_msm = get_separate_core(msm_target, ele_target, mode_separation, msm_target.DSWRF_msm, solpos)
+		msm_target.SR_msm = get_separate_core(msm_target, ele_target, mode_separation, msm_target.DSWRF_msm, solpos)
 	}
 }
 
 func get_separate_core(msm_target *MsmTarget,
 	ele_target float64,
-	mode_separation string, DSWRF_x []float64, solpos []SunPositionRecord) []AAA {
+	mode_separation string, DSWRF_x []float64, solpos []SunPositionRecord) []SolarRadiation {
 
 	flag_SH := false
 	flag_DN := false
 	l := len(msm_target.date)
-	AAA_x := make([]AAA, l)
+	AAA_x := make([]SolarRadiation, l)
 
 	Sinh := make([]float64, l)
 	IN0 := make([]float64, l)

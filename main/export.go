@@ -61,10 +61,10 @@ func (df_save *MsmTarget) to_csv(buf *bytes.Buffer) {
 		if df_save.DT != nil {
 			writeFloat(df_save.DT[i])
 		}
-		writeFloat(df_save.AAA_est[i].DN)
-		writeFloat(df_save.AAA_est[i].SH)
-		writeFloat(df_save.AAA_msm[i].DN)
-		writeFloat(df_save.AAA_msm[i].SH)
+		writeFloat(df_save.SR_est[i].DN)
+		writeFloat(df_save.SR_est[i].SH)
+		writeFloat(df_save.SR_msm[i].DN)
+		writeFloat(df_save.SR_msm[i].SH)
 		if df_save.NR != nil {
 			writeFloat(df_save.NR[i])
 		}

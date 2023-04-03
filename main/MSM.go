@@ -23,7 +23,7 @@ import (
 // Returns:
 //
 //	Tuple[int, int, int, int]: メッシュ周囲のMSM位置（緯度経度）と番号（北始まり0～、西始まり0～）
-func get_MSM(lat float64, lon float64) (int, int, int, int) {
+func get_meshcode_1d(lat float64, lon float64) (int, int, int, int) {
 	lat_unit := 0.05   // MSMの緯度間隔
 	lon_unit := 0.0625 // MSMの経度間隔
 
@@ -49,11 +49,10 @@ func get_MSM(lat float64, lon float64) (int, int, int, int) {
 //
 // Returns:
 //
-//	msm_list(list[str]): 読み込んだMSMファイルの一覧
-//	df_msm_list(list[pd.DataFrame]): 読み込んだデータフレームのリスト
+//	MsmDataSet: 読み込んだデータフレームのリスト
 //
 // """
-func load_msm_files(lat float64, lon float64, msm_file_dir string) ([]string, []MsmData) {
+func load_msm_files(lat float64, lon float64, msm_file_dir string) MsmDataSet {
 	// 計算に必要なMSMを算出して、ダウンロード⇒ファイルpathをリストで返す
 
 	// 保存先ディレクトリの作成
@@ -83,7 +82,7 @@ func load_msm_files(lat float64, lon float64, msm_file_dir string) ([]string, []
 		df_msm_list[ret.Index] = ret.Msm
 	}
 
-	return msm_list, df_msm_list
+	return MsmDataSet{Data: [4]MsmData(df_msm_list)}
 }
 
 type MsmAndIndex struct {
@@ -119,6 +118,7 @@ func load_msm(index int, msm_file_dir string, msm string, c chan MsmAndIndex) {
 	}
 
 	df_msm := MsmData{
+		name:      msm,
 		date:      make([]time.Time, len(data)),
 		TMP:       make([]float64, len(data)),
 		MR:        make([]float64, len(data)),
@@ -268,7 +268,7 @@ func fileExists(path string) bool {
 //
 // """
 func get_msm_requirements(lat float64, lon float64) []string {
-	MSM_S, MSM_N, MSM_W, MSM_E := get_MSM(lat, lon)
+	MSM_S, MSM_N, MSM_W, MSM_E := get_meshcode_1d(lat, lon)
 
 	// 周囲4地点のメッシュ地点番号
 	MSM_SW := fmt.Sprintf("%d-%d", MSM_S, MSM_W)
@@ -281,14 +281,18 @@ func get_msm_requirements(lat float64, lon float64) []string {
 
 // 緯度 lat, 経度 lon から計算に必要なMSMを決定し、各地点の標高を返す。
 // 各MSMファイルの標高は msm_elevation_master に格納されている値を使用する。
-func get_msm_elevations(lat float64, lon float64, msm_elevation_master [][]float64) [4]float64 {
+func (msm_elevation_master *Elevation2d) Elevations(lat float64, lon float64) [4]float64 {
 
-	MSM_S, MSM_N, MSM_W, MSM_E := get_MSM(lat, lon)
+	MSM_S, MSM_N, MSM_W, MSM_E := get_meshcode_1d(lat, lon)
 
-	ele_SW := msm_elevation_master[MSM_S][MSM_W] // SW
-	ele_SE := msm_elevation_master[MSM_S][MSM_E] // SE
-	ele_NW := msm_elevation_master[MSM_N][MSM_W] // NW
-	ele_NE := msm_elevation_master[MSM_N][MSM_E] // NE
+	ele_SW := msm_elevation_master.get_elevation_from_meshcode1d(MSM_S, MSM_W) // SW
+	ele_SE := msm_elevation_master.get_elevation_from_meshcode1d(MSM_S, MSM_E) // SE
+	ele_NW := msm_elevation_master.get_elevation_from_meshcode1d(MSM_N, MSM_W) // NW
+	ele_NE := msm_elevation_master.get_elevation_from_meshcode1d(MSM_N, MSM_E) // NE
 
 	return [4]float64{ele_SW, ele_SE, ele_NW, ele_NE}
+}
+
+func (msm_elevation_master *Elevation2d) get_elevation_from_meshcode1d(codeSN int, codeWE int) float64 {
+	return msm_elevation_master.DfMsmEle[codeSN][codeWE]
 }

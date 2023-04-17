@@ -10,6 +10,32 @@ import (
 // ref: 『統計に用いる標準地域メッシュおよび標準地域メッシュコード』
 //--------------------------------------
 
+// メッシュ周囲のMSM位置（緯度経度）と番号（北始まり0～、西始まり0～）の取得
+// Args:
+//
+//	lat(float64): 推計対象地点の緯度（10進法）
+//	lon(float64): 推計対象地点の経度（10進法）
+//
+// Returns:
+//
+//	Tuple[int, int, int, int]: メッシュ周囲のMSM位置（緯度経度）と番号（北始まり0～、西始まり0～）
+func Meshcode1d(lat float64, lon float64) (int, int, int, int) {
+	lat_unit := 0.05   // MSMの緯度間隔
+	lon_unit := 0.0625 // MSMの経度間隔
+
+	// 緯度⇒メッシュ番号
+	lat_S := math.Floor(lat/lat_unit) * lat_unit // 南は切り下げ
+	MSM_S := int(math.Round((47.6 - lat_S) / lat_unit))
+	MSM_N := int(MSM_S - 1)
+
+	// 経度⇒メッシュ番号
+	lon_W := math.Floor(lon/lon_unit) * lon_unit // 西は切り下げ
+	MSM_W := int(math.Round((lon_W - 120) / lon_unit))
+	MSM_E := int(MSM_W + 1)
+
+	return MSM_S, MSM_N, MSM_W, MSM_E
+}
+
 // 経度 lon, 緯度 lat からメッシュコード(1 次、2 次、3 次)を取得
 func MeshCodeFromLatLon(lat float64, lon float64) (int, int) {
 	lt := lat * 3.0 / 2.0

@@ -1,9 +1,16 @@
 package main
 
 import (
+	"log"
 	"math"
-	"time"
 )
+
+// 直散分離に関するデータ
+type SolarRadiation struct {
+	SH float64 //水平面天空日射量
+	DN float64 //法線面直達日射量
+	DT float64 //露点温度
+}
 
 // """直散分離を行い、水平面全天日射量から法線面直達日射量および水平天空日射量を取得する
 // Args:
@@ -26,9 +33,11 @@ func (msm_target *MsmTarget) SeparateSolarRadiation(
 	mode_separation string) {
 
 	//時刻データから太陽位置を計算
+	log.Print(" 時刻データから太陽位置を計算")
 	solpos := get_sun_position(lat, lon, msm_target.date)
 
 	//2種の日射量データについて繰り返し
+	log.Print(" 2種の日射量データについて繰り返し")
 	if msm_target.DSWRF_est != nil {
 		msm_target.SR_est = get_separate_core(msm_target, ele_target, mode_separation, msm_target.DSWRF_est, solpos)
 	}
@@ -44,7 +53,10 @@ func get_separate_core(msm_target *MsmTarget,
 	flag_SH := false
 	flag_DN := false
 	l := len(msm_target.date)
-	AAA_x := make([]SolarRadiation, l)
+	SR_x := make([]SolarRadiation, l)
+	// SH := make([]float64, l) //水平面天空日射量
+	DN := make([]float64, l) //法線面直達日射量
+	// DT := make([]float64, l) //露点温度
 
 	Sinh := make([]float64, l)
 	IN0 := make([]float64, l)
@@ -70,28 +82,28 @@ func get_separate_core(msm_target *MsmTarget,
 		//SHの取得
 		SH := get_SH(DSWRF_x, Sinh, IN0, method_SH)
 		for i := 0; i < l; i++ {
-			AAA_x[i].SH = SH[i]
+			SR_x[i].SH = SH[i]
 		}
 		flag_SH = true
 	} else if mode_separation == "Erbs" {
 		//Erbs方式でSHを計算
 		SH := get_SH_Erbs(DSWRF_x, IN0, Sinh)
 		for i := 0; i < l; i++ {
-			AAA_x[i].SH = SH[i]
+			SR_x[i].SH = SH[i]
 		}
 		flag_SH = true
 	} else if mode_separation == "Udagawa" {
 		//Udagawa方式でDNを計算
 		DN := get_DN_Udagawa(DSWRF_x, IN0, Sinh)
 		for i := 0; i < l; i++ {
-			AAA_x[i].DN = DN[i]
+			SR_x[i].DN = DN[i]
 		}
 		flag_DN = true
 	} else if mode_separation == "Perez" {
 		//Perez方式でDNを計算
-		DN := get_DN_perez(DSWRF_x, h, msm_target.DT, ele_target, IN0)
+		get_DN_perez(DSWRF_x, h, msm_target.DT, ele_target, IN0, DN)
 		for i := 0; i < l; i++ {
-			AAA_x[i].DN = DN[i]
+			SR_x[i].DN = DN[i]
 		}
 		flag_DN = true
 	} else {
@@ -102,138 +114,25 @@ func get_separate_core(msm_target *MsmTarget,
 		//SHを推計している場合(Nagata,Watanabe,Erbs)
 		//DNの取得
 		for i := 0; i < l; i++ {
-			DN := func_DN(DSWRF_x[i], AAA_x[i].SH, solpos[i].Sinh)
+			DN := func_DN(DSWRF_x[i], SR_x[i].SH, solpos[i].Sinh)
 			if DN <= 0.0 {
 				DN = 0.0
 			}
-			AAA_x[i].DN = DN
+			SR_x[i].DN = DN
 		}
 	} else if flag_DN {
 		//DNを取得している場合(Udagawa,Perez)
 		//SHの取得
 		for i := 0; i < l; i++ {
-			SH := func_SH(DSWRF_x[i], AAA_x[i].DN, solpos[i].Sinh)
+			SH := func_SH(DSWRF_x[i], SR_x[i].DN, solpos[i].Sinh)
 			if SH <= 0.0 {
 				SH = 0.0
 			}
-			AAA_x[i].SH = SH
+			SR_x[i].SH = SH
 		}
 	}
 
-	return AAA_x
-}
-
-// """緯度経度と日時データから太陽位置および大気外法線面日射量の計算を行う
-// Args:
-//
-//	lat(float64): 推計対象地点の緯度（10進法）
-//	lon(float64): 推計対象地点の経度（10進法）
-//	date(pd.Series): 計算対象の時刻データ
-//
-// Returns:
-//
-//	pd.DataFrame: 大気外法線面日射量、太陽高度角および方位角のデータフレーム
-//	              df[IN0:大気外法線面日射量,
-//	                 h:太陽高度角,
-//	                 Sinh:太陽高度角のサイン,
-//	                 A:太陽方位角]
-//
-// """
-func get_sun_position(lat float64,
-	lon float64,
-	date []time.Time) []SunPositionRecord {
-
-	//参照時刻の前1時間の太陽高度および方位角を取得する（1/10時間ずつ計算した平均値）
-	count := []float64{1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1}
-
-	J0 := 4.921                   //太陽定数[MJ/m²h] 4.921
-	dlt0 := degreeToRad(-23.4393) //冬至の日赤緯
-
-	var h [10]float64 //hの容器
-	var A [10]float64 //Aの容器
-
-	df := make([]SunPositionRecord, len(date))
-	for i := 0; i < len(df); i++ {
-		DY := date[i].Year()
-		//year := time.Date(DY, 1, 1, 0, 0, 0, 0, time.UTC)
-		nday := float64(date[i].YearDay()) //年間通日+1
-		Tm := date[i].Hour()               //標準時
-
-		n := float64(DY - 1968)
-
-		d0 := 3.71 + 0.2596*n - math.Floor((n+3)/4)                               //近日点通過日
-		m := 360 * (nday - d0) / 365.2596                                         //平均近点離角
-		eps := 12.3901 + 0.0172*(n+m/360)                                         //近日点と冬至点の角度
-		v := m + 1.914*math.Sin(degreeToRad(m)) + 0.02*math.Sin(degreeToRad(2*m)) //真近点離角
-		veps := degreeToRad(v + eps)
-		Et := (m - v) - radToDegree(math.Atan(0.043*math.Sin(2*veps)/(1.0-0.043*math.Cos(2*veps)))) //近時差
-
-		sindlt := math.Cos(veps) * math.Sin(dlt0)                  //赤緯の正弦
-		cosdlt := math.Pow(math.Abs(1.0-math.Pow(sindlt, 2)), 0.5) //赤緯の余弦
-
-		IN0 := J0 * (1 + 0.033*math.Cos(degreeToRad(v))) //IN0 大気外法線面日射量
-
-		lons := 135.0              //標準時の地点の経度
-		latrad := degreeToRad(lat) //緯度
-
-		for idx, j := range count {
-			tm := float64(Tm) - j
-			t := 15*(tm-12) + (lon - lons) + Et //時角
-			trad := degreeToRad(t)
-			Sinh := math.Sin(latrad)*sindlt + math.Cos(latrad)*cosdlt*math.Cos(trad) //太陽高度角の正弦
-			Cosh := math.Sqrt(1 - math.Pow(Sinh, 2))
-			SinA := cosdlt * math.Sin(trad) / Cosh
-			CosA := (Sinh*math.Sin(latrad) - sindlt) / (Cosh * math.Cos(latrad))
-
-			h[idx] = radToDegree(math.Asin(Sinh))
-			A[idx] = radToDegree(math.Atan2(SinA, CosA) + math.Pi)
-		}
-
-		//太陽高度
-		var h_avg float64
-		for i := 0; i < 10; i++ {
-			h_avg += h[i]
-		}
-		h_avg /= 10
-
-		//太陽高度角のサイン
-		Sinh := math.Sin(degreeToRad(h_avg))
-
-		//太陽方位角
-		var A_avg float64
-		for i := 0; i < 10; i++ {
-			A_avg += A[i]
-		}
-		A_avg /= 10
-
-		df[i].IN0 = IN0
-		df[i].h = h_avg
-		df[i].Sinh = Sinh
-		df[i].A = A_avg
-	}
-
-	return df
-}
-
-type SunPositionRecord struct {
-	// date string
-	// DY string
-	// year string
-	// nday int			////年間通日+1
-	// Tm string
-	// n int
-	// d0 int				//近日点通過日
-	// m float64			//平均近点離角
-	// eps float64			//近日点と冬至点の角度
-	// v float64			//真近点離角
-	// veps float64
-	// Et float64			//近時差
-	// sindlt float64		//赤緯の正弦
-	// consdlt float64		//赤緯の余弦
-	IN0  float64 //IN0 大気外法線面日射量
-	h    float64 //太陽高度(1時間平均)
-	Sinh float64 //太陽高度角のサイン
-	A    float64 //太陽方位角(1時間平均)
+	return SR_x
 }
 
 // """天空日射量SHの収束計算のループ
@@ -492,7 +391,10 @@ func func_SH_Erbs_1d_022(TH float64,
 // """
 func func_SH_Erbs_4d(TH float64,
 	KT float64) float64 {
-	return TH * (0.9511 - 0.1604*KT + 4.388*math.Pow(KT, 2) - 16.638*math.Pow(KT, 3) + 12.336*math.Pow(KT, 4))
+	KT2 := KT * KT
+	KT3 := KT2 * KT
+	KT4 := KT3 * KT
+	return TH * (0.9511 - 0.1604*KT + 4.388*KT2 - 16.638*KT3 + 12.336*KT4)
 }
 
 // """天空日射量の推計式 Erbsモデル 1次式（KTが0.80を超える）
@@ -930,6 +832,19 @@ func MJ_to_W(MJ float64) float64 {
 	return MJ / 3600 * 1000000
 }
 
+var CM [1260]float64
+var KTBIN, ZBIN, DKTBIN, WBIN []float64
+
+func init() {
+	//Pertzの係数
+	CM = get_CM()
+	// 係数選択のための閾値
+	KTBIN = []float64{0.24, 0.4, 0.56, 0.7, 0.8}
+	ZBIN = []float64{25.0, 40.0, 55.0, 70.0, 80.0}
+	DKTBIN = []float64{0.015, 0.035, 0.07, 0.15, 0.3}
+	WBIN = []float64{1.0, 2.0, 3.0}
+}
+
 // 直達日射量の推計(Pertz方式)
 // Args:
 //
@@ -950,12 +865,7 @@ func get_DN_perez_core(G_mj [3]float64,
 	ALT float64,
 	IN0 float64) float64 {
 
-	CM := get_CM()
-	// 係数選択のための閾値
-	KTBIN := []float64{0.24, 0.4, 0.56, 0.7, 0.8}
-	ZBIN := []float64{25.0, 40.0, 55.0, 70.0, 80.0}
-	DKTBIN := []float64{0.015, 0.035, 0.07, 0.15, 0.3}
-	WBIN := []float64{1.0, 2.0, 3.0}
+	//CM := get_CM()
 
 	// 度数法と弧度法の換算 degrees(1 radians)
 	//RTOD = 57.295779513082316
@@ -1025,8 +935,8 @@ func get_DN_perez_core(G_mj [3]float64,
 	}
 
 	var A, B, C float64
-	KT1_p2 := math.Pow(KT[1], 2)
-	KT1_p3 := math.Pow(KT[1], 3)
+	KT1_p2 := KT[1] * KT[1]  //KT[1]^2
+	KT1_p3 := KT1_p2 * KT[1] //KT[1]^3
 	if KT[1] <= 0.6 {
 		A = 0.512 - (1.56 * KT[1]) + (2.286 * KT1_p2) - (2.22 * KT1_p3)
 		B = 0.37 + (0.962 * KT[1])
@@ -1037,7 +947,10 @@ func get_DN_perez_core(G_mj [3]float64,
 		C = -47.01 + (184.2 * KT[1]) - (222.0 * KT1_p2) + (73.81 * KT1_p3)
 	}
 
-	KNC := 0.866 - (0.122 * AM[1]) + (0.0121 * (math.Pow(AM[1], 2.0))) - (0.000653 * (math.Pow(AM[1], 3.0))) + (0.000014 * (math.Pow(AM[1], 4.0)))
+	AM1_p2 := AM[1] * AM[1]  //AM[1]^2
+	AM1_p3 := AM1_p2 * AM[1] //AM[1]^3
+	AM1_p4 := AM1_p3 * AM[1] //AM[1]^4
+	KNC := 0.866 - (0.122 * AM[1]) + (0.0121 * AM1_p2) - (0.000653 * AM1_p3) + (0.000014 * AM1_p4)
 
 	BMAX := IO * (KNC - (A + B*math.Exp(C*AM[1])))
 
@@ -1087,10 +1000,8 @@ func IndexOf(v float64, bins []float64) int {
 	return len(bins)
 }
 
-func get_DN_perez(TH []float64, h []float64, TD []float64, ALT float64, IN0 []float64) []float64 {
-	// アウトプット用のリストを作成
+func get_DN_perez(TH []float64, h []float64, TD []float64, ALT float64, IN0 []float64, DN []float64) {
 	dataL := len(TH)
-	DN := make([]float64, dataL)
 
 	for i := 0; i < dataL; i++ {
 		var G, H [3]float64
@@ -1117,6 +1028,4 @@ func get_DN_perez(TH []float64, h []float64, TD []float64, ALT float64, IN0 []fl
 			DN[i] = dn
 		}
 	}
-
-	return DN
 }

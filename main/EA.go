@@ -18,66 +18,47 @@ import (
 //
 // 検討開始年 start_year, 検討終了年度 end_year の中で標準年を作成する。
 // 標準年データの検討に日射量の推計値を使用するには、use_est = True とする。(使用しない場合2018年以降のデータのみで作成)
-func (df_msm *MsmTarget) calc_EA(start_year int, end_year int, use_est bool) (*MsmTarget, []int) {
+func (msmt *MsmTarget) EA(start_year int, end_year int, useEst bool) *MsmTarget {
 
-	var df_targ *MsmTarget
+	//
+	// === 1. 月別に代表的な年を取得 ===
+	//
 
-	if use_est {
+	var msmtExt *MsmTarget
+
+	if useEst {
 		// * 標準年データの検討に日射量の推計値を使用する
 		//   -> `DSWRF_msm`列を削除し、`DSWRF_est`列を`DSWRF`列へ変更(推計値データを採用)
-		df_msm.DSWRF = append([]float64{}, df_msm.DSWRF_est...)
+		msmt.DSWRF = append([]float64{}, msmt.DSWRF_est...)
 
-		df_targ = df_msm.ExctactMsmYear(start_year, end_year)
+		msmtExt = msmt.ExctactMsmYear(start_year, end_year)
 
 		// TODO: drop, rename処理はcopyの後の方がよさそう
 
 	} else {
 		// * 2018年以降のデータのみで作成
 		// * `DSWRF_est`列を削除し、`DSWRF_msm`列を`DSWRF`列へ変更(MSMデータを採用)
-		df_msm.DSWRF = append([]float64{}, df_msm.DSWRF_msm...)
+		msmt.DSWRF = append([]float64{}, msmt.DSWRF_msm...)
 
 		if start_year < 2018 {
 			start_year = 2018
 		}
 
-		df_targ = df_msm.ExctactMsmYear(start_year, end_year)
+		msmtExt = msmt.ExctactMsmYear(start_year, end_year)
 
 		// TODO: drop, rename処理はcopyの後の方がよさそう
 		// TODO: copy処理は if/elseの両方で同じに見える
 	}
 
-	// ベクトル風速`w_spd`, 16方位の風向風速`w_dir`の列を削除
-	df_msm.w_spd = nil
-	df_msm.w_dir = nil
+	// 月平均値による信頼区間の判定
+	tempCI := msmtExt.TempCI()
 
-	// groupのターゲットを追加
-	// カラム [TMP, MR, DSWF, Ld, VGRD, UGRD, PRES, APCP01, MR_sat, w_spd, w_dir]
-	//   ↓
-	// カラム [TMP, MR, DSWF, Ld, VGRD, UGRD, PRES, APCP01, MR_sat, w_spd, w_dir, y, m, d]
-	//                            TMP        MR  DSWRF        Ld      VGRD      UGRD          PRES    APCP01    MR_sat     w_spd  w_dir     y   m   d
-	// date
-	// 2011-01-01 00:00:00  -6.776232  1.969510    0.0  0.772116 -3.051297  0.837700  98383.696285  0.021976  2.344268  3.139605  337.5  2011  01  01
-	// 2011-01-01 01:00:00  -5.862659  2.085005    0.0  0.793957 -3.203325  0.251010  98437.952674  0.001623  2.511178  3.203325  360.0  2011  01  01
-	// df_targ["y"] = df_targ.index.strftime('%Y')
-	// df_targ["m"] = df_targ.index.strftime('%m')
-	// df_targ["d"] = df_targ.index.strftime('%d')
+	// fs計算による信頼区間の判定
+	fsCI := msmtExt.FSCI()
 
-	// df_temp : 月平均値による信頼区間の判定
-	//         y   m   TMP  DSWRF    MR  APCP01  w_spd
-	// 0    2011  01  True   True  True    True   True
-	// 1    2012  01  True   True  True    True   True
-	// 2    2013  01  True   True  True    True   True
-	df_temp_ci := df_targ.get_temp_ci()
-
-	// df_fs : fs計算による信頼区間の判定
-	//         y   m    TMP  DSWRF     MR  APCP01  w_spd    TMP_FS
-	// 0    2011  01  False  False  False   False  False  0.076795
-	// 1    2012  01  False   True  False    True  False  0.149116
-	df_fs_ci := df_targ.get_fs_ci()
-
-	//TEST: この時点では、df_targ.APCP01の値は正常
+	//TEST: msmtExt.APCP01の値は正常
 	// for i := 0; i < len(df_targ.date); i++ {
-	// 	fmt.Printf("%d,%d,%d,%d,%.10f\n", df_targ.date[i].Year(), int(df_targ.date[i].Month()), df_targ.date[i].Day(), df_targ.date[i].Hour(), df_targ.APCP01[i])
+	// 	fmt.Printf("%d,%d,%d,%d,%.10f\n", msmtExt.date[i].Year(), int(msmtExt.date[i].Month()), msmtExt.date[i].Day(), msmtExt.date[i].Hour(), msmtExt.APCP01[i])
 	// }
 
 	//FOR TEST
@@ -86,62 +67,52 @@ func (df_msm *MsmTarget) calc_EA(start_year int, end_year int, use_est bool) (*M
 	// for m := 1; m <= 12; m++ {
 	// 	for y := 2011; y <= 2020; y++ {
 	// 		ym := YearMonth{y, m}
-	// 		row := df_fs_ci[ym]
+	// 		row := fsCI[ym]
 	// 		fmt.Printf("%d,%d,%t,%t,%t,%t,%t\n", y, m, row.TMP, row.DSWRF, row.MR, row.APCP01, row.w_spd)
 	// 	}
 	// }
 
 	// 信頼区間の判定結果を合成
-	df_ci := make(map[YearMonth]GroupData4, 120)
-	for ym := range df_temp_ci {
-		df_ci[ym] = GroupData4{
-			TMP_mean:    df_temp_ci[ym].TMP,
-			TMP_dev:     df_temp_ci[ym].TMP_dev,
-			DSWRF_mean:  df_temp_ci[ym].DSWRF,
-			MR_mean:     df_temp_ci[ym].MR,
-			APCP01_mean: df_temp_ci[ym].APCP01,
-			w_spd_mean:  df_temp_ci[ym].w_spd,
-			TMP_fs:      df_fs_ci[ym].TMP,
-			DSWRF_fs:    df_fs_ci[ym].DSWRF,
-			MR_fs:       df_fs_ci[ym].MR,
-			APCP01_fs:   df_fs_ci[ym].APCP01,
-			w_spd_fs:    df_fs_ci[ym].w_spd,
+	ci := make(map[YearMonth]CIData, 120)
+	for ym := range tempCI {
+		ci[ym] = CIData{
+			TMP_mean:    tempCI[ym].TMP,
+			TMP_dev:     tempCI[ym].TMP_dev,
+			DSWRF_mean:  tempCI[ym].DSWRF,
+			MR_mean:     tempCI[ym].MR,
+			APCP01_mean: tempCI[ym].APCP01,
+			w_spd_mean:  tempCI[ym].w_spd,
+			TMP_fs:      fsCI[ym].TMP,
+			DSWRF_fs:    fsCI[ym].DSWRF,
+			MR_fs:       fsCI[ym].MR,
+			APCP01_fs:   fsCI[ym].APCP01,
+			w_spd_fs:    fsCI[ym].w_spd,
 		}
 	}
 
 	// 月別に代表的な年を取得
-	rep_years := representativeYears(df_ci)
+	repYears := repYears(ci)
+
+	//
+	// === 2. 標準年データを合成 ===
+	//
 
 	// 月別に代表的な年から接合した1年間のデータを作成
-	df_patchwork := df_msm.patchRepresentataiveYears(rep_years)
+	EA := msmt.patchRepYears(repYears)
 
-	// 接合部の円滑化
-	for _, v := range SmoothingMonths(rep_years) {
-		df_patchwork.smoothMonthGaps(v, df_msm)
-	}
-
-	if use_est {
-		df_patchwork.DSWRF_est = df_patchwork.DSWRF
-		df_patchwork.DSWRF = nil
+	if useEst {
+		EA.DSWRF_est = EA.DSWRF
+		EA.DSWRF = nil
 	} else {
-		df_patchwork.DSWRF_msm = df_patchwork.DSWRF
-		df_patchwork.DSWRF = nil
+		EA.DSWRF_msm = EA.DSWRF
+		EA.DSWRF = nil
 	}
 
-	return df_patchwork, rep_years
+	return EA
 }
 
-// """月偏差値,月平均,年月平均のMSMデータフレームの作成
-// Args:
-//
-//	df: MSMデータフレーム
-//
-// Returns:
-//
-//	pd.DataFrame: 月偏差値,月平均,年月平均のMSMデータフレーム
-//
-// """
-func (msm *MsmTarget) grouping() map[YearMonth]GroupData0_1 {
+// 月偏差値,月平均,年月平均
+func (msm *MsmTarget) groupForTempCI() map[YearMonth]GroupDataForTempCI {
 
 	//月インデックス領域確保
 	index_m := make(map[int][]int, 12)
@@ -187,7 +158,8 @@ func (msm *MsmTarget) grouping() map[YearMonth]GroupData0_1 {
 
 		var sum_dev float64
 		for i := 0; i < n; i++ {
-			sum_dev += math.Pow(list[index[i]]-avg, 2)
+			dev := list[index[i]] - avg
+			sum_dev += dev * dev
 		}
 
 		std_dev := math.Sqrt(sum_dev / float64(n))
@@ -195,12 +167,12 @@ func (msm *MsmTarget) grouping() map[YearMonth]GroupData0_1 {
 		return std_dev
 	}
 
-	df_temp_m_mean := make(map[int]GroupData0, 12)
-	df_temp_m_std := make(map[int]GroupData0, 12)
+	df_temp_m_mean := make(map[int]SubGroupDataForTempCI, 12)
+	df_temp_m_std := make(map[int]SubGroupDataForTempCI, 12)
 
 	for m := range index_m {
 		//月平均
-		df_temp_m_mean[m] = GroupData0{
+		df_temp_m_mean[m] = SubGroupDataForTempCI{
 			TMP:    getMean(msm.TMP, index_m[m]),
 			DSWRF:  getMean(msm.DSWRF, index_m[m]),
 			MR:     getMean(msm.MR, index_m[m]),
@@ -208,7 +180,7 @@ func (msm *MsmTarget) grouping() map[YearMonth]GroupData0_1 {
 			w_spd:  getMean(msm.w_spd, index_m[m]),
 		}
 		//月標準偏差
-		df_temp_m_std[m] = GroupData0{
+		df_temp_m_std[m] = SubGroupDataForTempCI{
 			TMP:    getStdDev(msm.TMP, index_m[m]),
 			DSWRF:  getStdDev(msm.DSWRF, index_m[m]),
 			MR:     getStdDev(msm.MR, index_m[m]),
@@ -217,11 +189,11 @@ func (msm *MsmTarget) grouping() map[YearMonth]GroupData0_1 {
 		}
 	}
 
-	df_temp_ym_mean := make(map[YearMonth]GroupData0, 120)
+	df_temp_ym_mean := make(map[YearMonth]SubGroupDataForTempCI, 120)
 	for ym := range index_ym {
 		if len(index_ym[ym]) > 0 {
 			//年月平均
-			df_temp_ym_mean[ym] = GroupData0{
+			df_temp_ym_mean[ym] = SubGroupDataForTempCI{
 				TMP:    getMean(msm.TMP, index_ym[ym]),
 				DSWRF:  getMean(msm.DSWRF, index_ym[ym]),
 				MR:     getMean(msm.MR, index_ym[ym]),
@@ -231,9 +203,9 @@ func (msm *MsmTarget) grouping() map[YearMonth]GroupData0_1 {
 		}
 	}
 
-	df_temp := make(map[YearMonth]GroupData0_1, 120)
+	df_temp := make(map[YearMonth]GroupDataForTempCI, 120)
 	for ym := range df_temp_ym_mean {
-		df_temp[ym] = GroupData0_1{
+		df_temp[ym] = GroupDataForTempCI{
 			// TMP
 			TMP_mean_m:  df_temp_m_mean[ym.Month].TMP,
 			TMP_mean_ym: df_temp_ym_mean[ym].TMP,
@@ -260,23 +232,9 @@ func (msm *MsmTarget) grouping() map[YearMonth]GroupData0_1 {
 	return df_temp
 }
 
-// """気象パラメータごとに決められた信頼区間に入っているかの判定
-// Args:
-//
-//	df: MSMデータフレーム
-//
-// Returns:
-//
-//	pd.DataFrame: 各項目が想定信頼区間に入っているかを真偽値で格納したデータフレーム
-//	              カラム = y,m,TMP_dev,TMP,DSWRF,MR,APCP01,w_spd
-//	               y,mは年月、TMP_devは月平均気温の分散値、その他は真偽値
-//
-// """
-// df_temp(pd.DataFrame): 気象パラメータごとの年月平均,月平均,月標準偏差
-//
-//	カラム = y,m,[TMP,VGRD,PRESS,MR_sat]*[mean_ym,mean_y,std_m]
-func (msm *MsmTarget) get_temp_ci() map[YearMonth]GroupData {
-	var df_temp map[YearMonth]GroupData0_1 = msm.grouping()
+// 気象パラメータごとに決められた信頼区間に入っているかの判定
+func (msm *MsmTarget) TempCI() map[YearMonth]TempCIData {
+	var df_temp map[YearMonth]GroupDataForTempCI = msm.groupForTempCI()
 
 	// 気象パラメータと基準となる標準偏差(σ)の倍率
 	const std_rate_TMP = 1.0
@@ -285,7 +243,7 @@ func (msm *MsmTarget) get_temp_ci() map[YearMonth]GroupData {
 	const std_rate_APCP01 = 1.5
 	const std_rate_w_spd = 1.5
 
-	df_ret := make(map[YearMonth]GroupData, 120)
+	df_ret := make(map[YearMonth]TempCIData, 120)
 
 	for ym, v := range df_temp {
 		// 月平均と年月平均の差分(絶対値)計算 => "XXX_mean"
@@ -311,7 +269,7 @@ func (msm *MsmTarget) get_temp_ci() map[YearMonth]GroupData {
 		w_spd_dev := math.Abs(v.w_spd_mean_m - v.w_spd_mean_ym)
 		w_spd := w_spd_dev <= std_rate_w_spd*v.w_spd_std_m
 
-		df_ret[ym] = GroupData{
+		df_ret[ym] = TempCIData{
 			TMP:     TMP,
 			TMP_dev: TMP_dev,
 			DSWRF:   DSWRF,
@@ -330,45 +288,39 @@ func (msm *MsmTarget) get_temp_ci() map[YearMonth]GroupData {
 	return df_ret
 }
 
-type GroupData struct {
+type TempCIData struct {
 	TMP, DSWRF, MR, APCP01, w_spd bool
 	TMP_dev                       float64
 }
 
-type GroupData4AndYear struct {
+// 平均、FS値を年ごとに並べ
+type MsmMeanAndFSByYear struct {
 	Year                                                   []int
 	TMP_mean, DSWRF_mean, MR_mean, APCP01_mean, w_spd_mean []bool
 	TMP_fs, DSWRF_fs, MR_fs, APCP01_fs, w_spd_fs           []bool
 	TMP_dev                                                []float64
 }
 
-type GroupData4 struct {
+// 信頼区間判定結果
+type CIData struct {
 	TMP_mean, DSWRF_mean, MR_mean, APCP01_mean, w_spd_mean bool
 	TMP_fs, DSWRF_fs, MR_fs, APCP01_fs, w_spd_fs           bool
 	TMP_dev                                                float64
 }
 
-type GroupData0_1 struct {
+// 月偏差値,月平均,年月平均
+type GroupDataForTempCI struct {
 	TMP_mean_m, DSWRF_mean_m, MR_mean_m, APCP01_mean_m, w_spd_mean_m      float64
 	TMP_mean_ym, DSWRF_mean_ym, MR_mean_ym, APCP01_mean_ym, w_spd_mean_ym float64
 	TMP_std_m, DSWRF_std_m, MR_std_m, APCP01_std_m, w_spd_std_m           float64
 }
 
-type GroupData0 struct {
+type SubGroupDataForTempCI struct {
 	TMP, DSWRF, MR, APCP01, w_spd float64
 }
 
-func (df *MsmTarget) get_fs_ci() map[YearMonth]FSData {
-	// """FS(Finkelstein Schafer statistics)計算
-
-	// Args:
-	//   df: 1時間ごとの気象パラメータが入ったデータフレーム
-	//       カラム=date,y,m,d,TMP,DSWRF,MR,APCP01,w_spd
-
-	// Returns:
-	//   DataFrame: カラム=y,m,TMP,DSWRF,MR,APCP01,w_spd,TMP_FS
-	// """
-
+// FS(Finkelstein Schafer statistics)計算
+func (df *MsmTarget) FSCI() map[YearMonth]FSCIData {
 	// 気象パラメータと信頼区間(σ)
 	const std_rate_TMP = 1.0
 	const std_rate_DSWRF = 1.0
@@ -377,7 +329,7 @@ func (df *MsmTarget) get_fs_ci() map[YearMonth]FSData {
 	const std_rate_w_spd = 1.5
 
 	//インデックス生成
-	var g_ymd_mean GroupData2
+	var g_ymd_mean YMDMeanData
 	for i := 0; i < len(df.date); i += 24 {
 		y := df.date[i].Year()
 		m := int(df.date[i].Month())
@@ -399,7 +351,7 @@ func (df *MsmTarget) get_fs_ci() map[YearMonth]FSData {
 	}
 
 	// 年月日ごとの平均を生成
-	getMeanForYearMonthGroupDay := func(list []float64, g *GroupData2) []float64 {
+	getMeanForYearMonthGroupDay := func(list []float64, g *YMDMeanData) []float64 {
 		mean_list := make([]float64, len(g.Day))
 		for i := 0; i < len(g.Day); i++ {
 			mean_list[i] = getMean24H(list, i*24)
@@ -415,15 +367,15 @@ func (df *MsmTarget) get_fs_ci() map[YearMonth]FSData {
 	g_ymd_mean.w_spd_mean_ymd = getMeanForYearMonthGroupDay(df.w_spd, &g_ymd_mean)
 
 	// FS値,FS値の偏差,FS値の偏差が指定範囲内に入っているか
-	TMP_FS := g_ymd_mean.make_fs(func(msm *GroupData2, i int) float64 { return msm.TMP_mean_ymd[i] }, std_rate_TMP)
-	DSWRF_FS := g_ymd_mean.make_fs(func(msm *GroupData2, i int) float64 { return msm.DSWRF_mean_ymd[i] }, std_rate_DSWRF)
-	MR_FS := g_ymd_mean.make_fs(func(msm *GroupData2, i int) float64 { return msm.MR_mean_ymd[i] }, std_rate_MR)
-	APCP01_FS := g_ymd_mean.make_fs(func(msm *GroupData2, i int) float64 { return msm.APCP01_mean_ymd[i] }, std_rate_APCP01)
-	w_spd_FS := g_ymd_mean.make_fs(func(msm *GroupData2, i int) float64 { return msm.w_spd_mean_ymd[i] }, std_rate_w_spd)
+	TMP_FS := g_ymd_mean.makeFS(func(msm *YMDMeanData, i int) float64 { return msm.TMP_mean_ymd[i] }, std_rate_TMP)
+	DSWRF_FS := g_ymd_mean.makeFS(func(msm *YMDMeanData, i int) float64 { return msm.DSWRF_mean_ymd[i] }, std_rate_DSWRF)
+	MR_FS := g_ymd_mean.makeFS(func(msm *YMDMeanData, i int) float64 { return msm.MR_mean_ymd[i] }, std_rate_MR)
+	APCP01_FS := g_ymd_mean.makeFS(func(msm *YMDMeanData, i int) float64 { return msm.APCP01_mean_ymd[i] }, std_rate_APCP01)
+	w_spd_FS := g_ymd_mean.makeFS(func(msm *YMDMeanData, i int) float64 { return msm.w_spd_mean_ymd[i] }, std_rate_w_spd)
 
-	FS := make(map[YearMonth]FSData)
+	FS := make(map[YearMonth]FSCIData)
 	for ym := range TMP_FS {
-		FS[ym] = FSData{
+		FS[ym] = FSCIData{
 			TMP:    TMP_FS[ym],
 			DSWRF:  DSWRF_FS[ym],
 			MR:     MR_FS[ym],
@@ -439,17 +391,18 @@ type YearMonthDay struct {
 	Year, Month, Day int
 }
 
-type FSData struct {
+type FSCIData struct {
 	TMP, DSWRF, MR, APCP01, w_spd bool
 }
 
-type GroupData2 struct {
+// 日平均値
+type YMDMeanData struct {
 	Year, Month, Day []int
 
 	TMP_mean_ymd, DSWRF_mean_ymd, MR_mean_ymd, APCP01_mean_ymd, w_spd_mean_ymd []float64
 }
 
-func (g_ymd_mean *GroupData2) make_fs(key func(*GroupData2, int) float64, std_rate float64) map[YearMonth]bool {
+func (g_ymd_mean *YMDMeanData) makeFS(key func(*YMDMeanData, int) float64, std_rate float64) map[YearMonth]bool {
 	// """特定の気象パラメータに対するFS(Finkelstein Schafer statistics)計算
 
 	// Args:
@@ -461,13 +414,13 @@ func (g_ymd_mean *GroupData2) make_fs(key func(*GroupData2, int) float64, std_ra
 	//   DataFrame: カラム=y,m,<key>,<key>_FS,<key>_FS_std
 	// """
 	// 月ごとの累積度数分布(CDF)の計算
-	cdf_ALL := g_ymd_mean.make_cdf(
-		func(msm *GroupData2, i int) int { return msm.Month[i] },
+	cdf_ALL := g_ymd_mean.makeCDF(
+		func(msm *YMDMeanData, i int) int { return msm.Month[i] },
 		key)
 
 	// 年月ごとの累積度数分布(CDF)の計算
-	cdf_year := g_ymd_mean.make_cdf(
-		func(msm *GroupData2, i int) int { return msm.Year[i]*100 + msm.Month[i] },
+	cdf_year := g_ymd_mean.makeCDF(
+		func(msm *YMDMeanData, i int) int { return msm.Year[i]*100 + msm.Month[i] },
 		key)
 
 	// 日ごとのFS値の計算
@@ -513,7 +466,7 @@ func (g_ymd_mean *GroupData2) make_fs(key func(*GroupData2, int) float64, std_ra
 	for m := range fs_m_list {
 		list_sq := make([]float64, len(fs_m_list[m]))
 		for i := 0; i < len(list_sq); i++ {
-			list_sq[i] = math.Pow(fs_m_list[m][i], 2.0)
+			list_sq[i] = pow2(fs_m_list[m][i])
 		}
 		fs_std_m[m] = math.Sqrt(mean(list_sq))
 	}
@@ -530,6 +483,10 @@ func (g_ymd_mean *GroupData2) make_fs(key func(*GroupData2, int) float64, std_ra
 	}
 
 	return typical
+}
+
+func pow2(v float64) float64 {
+	return v * v
 }
 
 func mean(list []float64) float64 {
@@ -549,7 +506,7 @@ type YearMonthIndex struct {
 	Index       int
 }
 
-func (g_ymd_mean *GroupData2) make_cdf(by func(*GroupData2, int) int, key func(*GroupData2, int) float64) []float64 {
+func (g_ymd_mean *YMDMeanData) makeCDF(by func(*YMDMeanData, int) int, key func(*YMDMeanData, int) float64) []float64 {
 	// """特定の気象パラメータに対するCDF計算
 	// g_ymd_mean に 名前が<key>_<suffix> のカラムを追加し、CDFを格納する。
 
@@ -607,43 +564,20 @@ type IndexAndValue struct {
 	Value float64
 }
 
-type GroupData3 struct {
-	Year, Month       int
-	TMP_dev, TMP_mean []float64
-	DSWRF_mean        []float64
-	MR_mean           []float64
-	APCP01_mean       []float64
-	w_spd_mean        []float64
-	TMP_fs            []float64
-	DSWRF_fs          []float64
-	MR_fs             []float64
-	APCP01_fs         []float64
-	w_spd_fs          []float64
-}
-
 // **** 代表年の決定と接合処理 ****
 
-func representativeYears(df_ci map[YearMonth]GroupData4) []int {
-	// """
-
-	// Args:
-	//   df_ci(pd.DataFrame): 信頼区間判定結果の入ったデータフレーム
-
-	// Returns:
-	//   List[int]: 月別の代表的な年
-	// """
-
-	// 選定は、気温(偏差)=>水平面全天日射量(偏差)=>絶対湿度(偏差)=>降水量(偏差)=>風速(偏差)=>
-	// 気温(FS)=>水平面全天日射量(FS)=>絶対湿度(FS)=>降水量(FS)=>風速(FS)の順に判定を行う
-	// 最終的に複数が候補となった場合は気温(偏差)が最も0に近い年を選定する。
-
+// 信頼区間の判定結果 ci を基に、月別の代表的な年を取得する。
+// 選定は、気温(偏差)=>水平面全天日射量(偏差)=>絶対湿度(偏差)=>降水量(偏差)=>風速(偏差)=>
+// 気温(FS)=>水平面全天日射量(FS)=>絶対湿度(FS)=>降水量(FS)=>風速(FS)の順に判定を行う
+// 最終的に複数が候補となった場合は気温(偏差)が最も0に近い年を選定する。
+func repYears(ci map[YearMonth]CIData) []int {
 	select_year := []int{}
 
 	//月ごとのグループ化
-	g_m := make(map[int]*GroupData4AndYear, 12)
-	for ym, v := range df_ci {
+	g_m := make(map[int]*MsmMeanAndFSByYear, 12)
+	for ym, v := range ci {
 		if _, ok := g_m[ym.Month]; !ok {
-			g_m[ym.Month] = &GroupData4AndYear{
+			g_m[ym.Month] = &MsmMeanAndFSByYear{
 				Year:        []int{},
 				TMP_mean:    []bool{},
 				DSWRF_mean:  []bool{},
@@ -793,18 +727,9 @@ func representativeYears(df_ci map[YearMonth]GroupData4) []int {
 	return select_year
 }
 
-func (df *MsmTarget) patchRepresentataiveYears(rep_years []int) *MsmTarget {
-	// """標準年の作成
-	// 月別に代表的な年から接合した1年間のデータを作成します。
-
-	// Args:
-	//   df(pd.DataFrame):
-	//   rep_years(List[int]): 月別の代表的な年
-
-	// Returns:
-	//   pd.DataFrame: 標準年のMSMデータフレーム
-	// """
-	df_EA := MsmTarget{
+// 月別の代表的な年 repYears を基に標準年のデータを作成する。
+func (msmt *MsmTarget) patchRepYears(repYears []int) *MsmTarget {
+	EA := MsmTarget{
 		date:   []time.Time{},
 		TMP:    []float64{},
 		MR:     []float64{},
@@ -826,7 +751,7 @@ func (df *MsmTarget) patchRepresentataiveYears(rep_years []int) *MsmTarget {
 	mdays := [...]int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
 
 	// 月別に代表的な年のデータを抜き出す
-	for i, year := range rep_years {
+	for i, year := range repYears {
 
 		month := time.Month(i + 1)
 
@@ -835,44 +760,45 @@ func (df *MsmTarget) patchRepresentataiveYears(rep_years []int) *MsmTarget {
 		end_date := time.Date(year, month, mdays[int(month)-1], 23, 0, 0, 0, time.Local)
 
 		// 抜き出した代表データ
-		df_temp := df.ExctactMsm(start_date, end_date)
+		df_temp := msmt.ExctactMsm(start_date, end_date)
 
 		// 接合
-		df_EA.date = append(df_EA.date, df_temp.date...)
-		df_EA.TMP = append(df_EA.TMP, df_temp.TMP...)
-		df_EA.MR = append(df_EA.MR, df_temp.MR...)
-		df_EA.DSWRF = append(df_EA.DSWRF, df_temp.DSWRF...)
-		df_EA.Ld = append(df_EA.Ld, df_temp.Ld...)
-		df_EA.VGRD = append(df_EA.VGRD, df_temp.VGRD...)
-		df_EA.UGRD = append(df_EA.UGRD, df_temp.UGRD...)
-		df_EA.PRES = append(df_EA.PRES, df_temp.PRES...)
-		df_EA.APCP01 = append(df_EA.APCP01, df_temp.APCP01...)
-		df_EA.RH = append(df_EA.RH, df_temp.RH...)
-		df_EA.Pw = append(df_EA.Pw, df_temp.Pw...)
-		df_EA.DT = append(df_EA.DT, df_temp.DT...)
-		df_EA.NR = append(df_EA.NR, df_temp.NR...)
-		df_EA.SR_est = append(df_EA.SR_est, df_temp.SR_est...)
-		df_EA.SR_msm = append(df_EA.SR_msm, df_temp.SR_msm...)
+		EA.date = append(EA.date, df_temp.date...)
+		EA.TMP = append(EA.TMP, df_temp.TMP...)
+		EA.MR = append(EA.MR, df_temp.MR...)
+		EA.DSWRF = append(EA.DSWRF, df_temp.DSWRF...)
+		EA.Ld = append(EA.Ld, df_temp.Ld...)
+		EA.VGRD = append(EA.VGRD, df_temp.VGRD...)
+		EA.UGRD = append(EA.UGRD, df_temp.UGRD...)
+		EA.PRES = append(EA.PRES, df_temp.PRES...)
+		EA.APCP01 = append(EA.APCP01, df_temp.APCP01...)
+		EA.RH = append(EA.RH, df_temp.RH...)
+		EA.Pw = append(EA.Pw, df_temp.Pw...)
+		EA.DT = append(EA.DT, df_temp.DT...)
+		EA.NR = append(EA.NR, df_temp.NR...)
+		EA.SR_est = append(EA.SR_est, df_temp.SR_est...)
+		EA.SR_msm = append(EA.SR_msm, df_temp.SR_msm...)
 	}
 
-	for i := 0; i < len(df_EA.date); i++ {
-		df_EA.date[i] = time.Date(1970, df_EA.date[i].Month(), df_EA.date[i].Day(), df_EA.date[i].Hour(), 0, 0, 0, time.Local)
+	for i := 0; i < len(EA.date); i++ {
+		EA.date[i] = time.Date(1970, EA.date[i].Month(), EA.date[i].Day(), EA.date[i].Hour(), 0, 0, 0, time.Local)
 	}
 
-	return &df_EA
+	// 接合部の円滑化
+	for _, v := range SmoothingMonths(repYears) {
+		EA.smoothMonthGaps(v, msmt)
+	}
+
+	// ベクトル風速から16方位の風向風速を再計算
+	EA.WindVectorToDirAndSpeed()
+
+	return &EA
 }
 
 // **** 円滑化処理 ****
 
-func SmoothingMonths(rep_years []int) []SmootingMonth {
-	// """円滑化が必要な月の取得
-
-	// Args:
-	//   rep_years(List[int]): 月別の代表的な年
-
-	// Returns:
-	//   Generator[int, int, int]: 円滑化が必要な月,前月の代表年,対象月の代表年のタプル
-	// """
+// 円滑化が必要な月の取得
+func SmoothingMonths(repYears []int) []SmootingMonth {
 
 	mlist := []SmootingMonth{}
 
@@ -883,13 +809,13 @@ func SmoothingMonths(rep_years []int) []SmootingMonth {
 		// 前月の代表年
 		var before_year int
 		if i > 0 {
-			before_year = int(rep_years[i-1])
+			before_year = int(repYears[i-1])
 		} else {
-			before_year = int(rep_years[len(rep_years)-1])
+			before_year = int(repYears[len(repYears)-1])
 		}
 
 		// 対象月の代表年
-		after_year := int(rep_years[i])
+		after_year := int(repYears[i])
 
 		// 前月と対象月では対象年が異なる または 前月が2月かつその代表年が閏年の場合
 		before_year_date := time.Date(before_year, time.December, 31, 0, 0, 0, 0, time.Local)
@@ -907,24 +833,13 @@ type SmootingMonth struct {
 	AfterYear   int
 }
 
-func (df_EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, df_temp *MsmTarget) {
-	// """月別に代表的な年からの接合部を滑らかに加工する
-
-	// Args:
-	//   after_month(int): 対象月
-	//   after_year(int): 対象月の代表年
-	//   before_year(int): 前月の代表年
-	//   df_temp(pd.DataFrame): 全期間のデータ
-	//   df_EA(pd.DataFrame): 1年分にあらく結合したデータ
-	// """
-	// [1, 0.92, 0.83, ...., 0.0], [0.0, 0.08, 0.17, 0.25, ..., 1.0]
+// 月別に代表的な年からの接合部を滑らかに加工する
+func (EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, msmt *MsmTarget) {
 
 	after_month := sm.TargetMonth
 	before_year := sm.BeforeYear
 	after_year := sm.AfterYear
 
-	// before_coef = np.linspace(1, 0, 13, endpoint=True)
-	// after_coef = np.linspace(0, 1, 13, endpoint=True)
 	var before_coef, after_coef [13]float64
 	for i := 0; i < 13; i++ {
 		after_coef[i] = float64(i) / 12.0
@@ -953,7 +868,7 @@ func (df_EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, df_temp *MsmTarget) {
 		before_end := time.Date(int(before_year+1), 1, 1, 6, 0, 0, 0, time.Local)
 
 		// 前月の代表年の12月31日18時から翌年1月1日6時までのMSMデータフレーム
-		df_before = df_temp.ExctactMsm(before_start, before_end)
+		df_before = msmt.ExctactMsm(before_start, before_end)
 
 		// 対象月の代表年の前年の12月31日18時
 		after_start := time.Date(int(after_year-1), 12, 31, 18, 0, 0, 0, time.Local)
@@ -962,7 +877,7 @@ func (df_EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, df_temp *MsmTarget) {
 		after_end := time.Date(int(after_year), 1, 1, 6, 0, 0, 0, time.Local)
 
 		// 対象月の代表年の前年12月31日18時から翌年1月1日6時までのMSMデータフレーム
-		df_after = df_temp.ExctactMsm(after_start, after_end)
+		df_after = msmt.ExctactMsm(after_start, after_end)
 
 		// 1970年12月31日18時-23時 および 1月1日0時-6時
 		// 1970年12月31日18時-23時
@@ -985,7 +900,7 @@ func (df_EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, df_temp *MsmTarget) {
 		before_end := time.Date(before_year, 3, 1, 6, 0, 0, 0, time.Local)
 
 		// 前月の代表年における2月28日18時から3月1日6時までのMSMデータフレーム
-		df_before = df_temp.ExctactMsm(before_start, before_end)
+		df_before = msmt.ExctactMsm(before_start, before_end)
 
 		// 結合する2つの月の遅い月(対象月)の代表年における2月28日18時(はじまり)
 		after_start := time.Date(after_year, 2, 28, 18, 0, 0, 0, time.Local)
@@ -994,7 +909,7 @@ func (df_EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, df_temp *MsmTarget) {
 		after_end := after.Add(time.Hour * 6)
 
 		// 対象月の代表年における2月28日18時から3月1日6時までのMSMデータフレーム
-		df_after = df_temp.ExctactMsm(after_start, after_end)
+		df_after = msmt.ExctactMsm(after_start, after_end)
 
 		// MSMデータフレームから2月29日を除外
 		df_before = df_before.filterMsmLeapYear29th()
@@ -1012,7 +927,7 @@ func (df_EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, df_temp *MsmTarget) {
 		before_end := before.Add(time.Hour * 6)
 
 		// 前月の代表年における対象月の1日の前月末日18時から1日6時までのMSMデータフレーム
-		df_before = df_temp.ExctactMsm(before_start, before_end)
+		df_before = msmt.ExctactMsm(before_start, before_end)
 
 		// 対象月の代表年における対象月の1日の前月末日18時
 		after_start := after.Add(time.Hour * -6)
@@ -1021,7 +936,7 @@ func (df_EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, df_temp *MsmTarget) {
 		after_end := after.Add(time.Hour * 6)
 
 		// 対象月の代表年における対象月の1日の前月末日18時から1日6時までのMSMデータフレーム
-		df_after = df_temp.ExctactMsm(after_start, after_end)
+		df_after = msmt.ExctactMsm(after_start, after_end)
 
 		// 対象月の1970年における対象月の1日の前日18時から翌日6時まで
 		for i := -6; i <= 6; i++ {
@@ -1047,8 +962,7 @@ func (df_EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, df_temp *MsmTarget) {
 	DT := [13]float64{}
 	AAA_est := [13]SolarRadiation{}
 	AAA_msm := [13]SolarRadiation{}
-	// w_spd := [13]float64{}
-	// w_dir := [13]float64{}
+	// w_spd, w_dir はVGRD, UGRDから再計算する
 
 	for i := 0; i < 13; i++ {
 		date[i] = timestamp[i] //タイムスタンプは例外
@@ -1074,32 +988,30 @@ func (df_EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, df_temp *MsmTarget) {
 			df_before.SR_msm[i].DT*before_coef[i] + df_after.SR_msm[i].DT*after_coef[i],
 		}
 		DT[i] = df_before.DT[i]*before_coef[i] + df_after.DT[i]*after_coef[i]
-		// w_spd[i] = df_before.w_spd[i]*before_coef[i] + df_after.w_spd[i]*after_coef[i]
-		// w_dir[i] = df_before.w_dir[i]*before_coef[i] + df_after.w_dir[i]*after_coef[i]
+		// w_spd, w_dir はVGRD, UGRDから再計算する
 	}
 
 	dateIndex := make(map[time.Time]int, 13)
-	for i := 0; i < len(df_EA.date); i++ {
-		dateIndex[df_EA.date[i]] = i
+	for i := 0; i < len(EA.date); i++ {
+		dateIndex[EA.date[i]] = i
 	}
 
 	for i := 0; i < 13; i++ {
 		index := dateIndex[date[i]]
-		df_EA.TMP[index] = TMP[i]
-		df_EA.MR[index] = MR[i]
-		df_EA.DSWRF[index] = DSWRF[i]
-		df_EA.Ld[index] = Ld[i]
-		df_EA.VGRD[index] = VGRD[i]
-		df_EA.UGRD[index] = UGRD[i]
-		df_EA.PRES[index] = PRES[i]
-		df_EA.APCP01[index] = APCP01[i]
-		df_EA.RH[index] = RH[i]
-		df_EA.Pw[index] = Pw[i]
-		df_EA.DT[index] = DT[i]
-		df_EA.NR[index] = NR[i]
-		df_EA.SR_est[index] = AAA_est[i]
-		df_EA.SR_msm[index] = AAA_msm[i]
-		// df_EA.w_spd[index] = w_spd[i]
-		// df_EA.w_dir[index] = w_dir[i]
+		EA.TMP[index] = TMP[i]
+		EA.MR[index] = MR[i]
+		EA.DSWRF[index] = DSWRF[i]
+		EA.Ld[index] = Ld[i]
+		EA.VGRD[index] = VGRD[i]
+		EA.UGRD[index] = UGRD[i]
+		EA.PRES[index] = PRES[i]
+		EA.APCP01[index] = APCP01[i]
+		EA.RH[index] = RH[i]
+		EA.Pw[index] = Pw[i]
+		EA.DT[index] = DT[i]
+		EA.NR[index] = NR[i]
+		EA.SR_est[index] = AAA_est[i]
+		EA.SR_msm[index] = AAA_msm[i]
+		// w_spd, w_dir はVGRD, UGRDから再計算する
 	}
 }

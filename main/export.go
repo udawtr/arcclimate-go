@@ -6,6 +6,7 @@ import (
 	"strconv"
 )
 
+// CSV形式
 func (df_save *MsmTarget) to_csv(buf *bytes.Buffer) {
 	buf.WriteString("date")
 	buf.WriteString(",TMP")
@@ -74,18 +75,12 @@ func (df_save *MsmTarget) to_csv(buf *bytes.Buffer) {
 	}
 }
 
-// """HASP形式への変換
-// Args:
-//
-//	df(pd.DataFrame): MSMデータフレーム
-//	out(io.StringIO): 出力先のテキストストリーム
+// HASP形式
 //
 // Note:
 //
 //	法線面直達日射量、水平面天空日射量、水平面夜間日射量は0を出力します。
 //	曜日の祝日判定を行っていません。
-//
-// """
 func (df *MsmTarget) to_has(out *bytes.Buffer) {
 	for d := 0; d < 365; d++ {
 		off := d * 24
@@ -147,21 +142,13 @@ func (df *MsmTarget) to_has(out *bytes.Buffer) {
 	}
 }
 
-// """初期化処理
-// Args:
-//
-//	df(pd.DataFrame): MSMデータフレーム
-//	out(io.StringIO): 出力先のテキストストリーム
-//	lat(float): 推計対象地点の緯度（10進法）
-//	lon(float): 推計対象地点の経度（10進法）
+// EPW形式
 //
 // Note:
 //
 //	"EnergyPlus Auxilary Programs"を参考に記述されました。
 //	外気温(単位:℃)、風向(単位:°)、風速(単位:m/s)、降水量の積算値(単位:mm/h)のみを出力します。
 //	それ以外の値については、"missing"に該当する値を出力します。
-//
-// """
 func (msm *MsmTarget) to_epw(out *bytes.Buffer, lat float64, lon float64) {
 
 	// LOCATION

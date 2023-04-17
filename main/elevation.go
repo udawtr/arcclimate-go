@@ -1,13 +1,26 @@
 package main
 
 import (
+	"bytes"
+	"embed"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
+	"strconv"
 )
+
+type ElevationMaster struct {
+
+	//MSM4地点の平均標高を取得するため2次メッシュコードまでの標高
+	DfMsmEle [][]float64
+
+	// ピンポイントの標高のため、3次メッシュコードまで含んだ標高
+	DfMeshEle map[int]map[int]float64
+}
 
 //--------------------------------------
 // 標高
@@ -21,13 +34,13 @@ func ElevationFromLatLon(
 	lat float64,
 	lon float64,
 	mode_elevation string,
-	mesh_elevation_master *Elevation3d) float64 {
+	mesh_elevation_master *ElevationMaster) float64 {
 
 	var elevation float64
 
 	if mode_elevation == "mesh" {
 		// 標高補正に3次メッシュ（1㎞メッシュ）の平均標高データを使用する場合
-		elevation = mesh_elevation_master.elevationFromMesh(lat, lon)
+		elevation = mesh_elevation_master.Elevation3d(lat, lon)
 
 		log.Printf("入力された緯度・経度が含まれる3次メッシュの平均標高 %fm で計算します", elevation)
 
@@ -43,7 +56,7 @@ func ElevationFromLatLon(
 			// 標高補正に3次メッシュ（1㎞メッシュ）の平均標高データにフォールバック
 			// ref: https://maps.gsi.go.jp/development/elevation_s.html
 			// ref: https://github.com/gsi-cyberjapan/elevation-php/blob/master/getelevation.php
-			elevation = mesh_elevation_master.elevationFromMesh(lat, lon)
+			elevation = mesh_elevation_master.Elevation3d(lat, lon)
 			log.Printf("国土地理院のAPIから標高データを取得できなかったため、\n"+
 				"入力された緯度・経度が含まれる3次メッシュの平均標高 %fm で計算します", elevation)
 		}
@@ -55,10 +68,14 @@ func ElevationFromLatLon(
 }
 
 // 3次メッシュ（1㎞メッシュ）の平均標高データ mesh_elevation_master を用いて、緯度 lat, 経度 lonの地点の標高[m]の取得します。
-func (mesh_elevation_master *Elevation3d) elevationFromMesh(lat float64, lon float64) float64 {
+func (mesh_elevation_master *ElevationMaster) Elevation3d(lat float64, lon float64) float64 {
 	meshcode1d, meshcode23d := MeshCodeFromLatLon(lat, lon)
 	elevation := mesh_elevation_master.DfMeshEle[meshcode1d][meshcode23d]
 	return elevation
+}
+
+func (msm_elevation_master *ElevationMaster) Elevation2d(codeSN int, codeWE int) float64 {
+	return msm_elevation_master.DfMsmEle[codeSN][codeWE]
 }
 
 // 国土地理院のAPI を用いて、緯度 lat, 経度 lonの地点の標高[m]の取得します。
@@ -87,4 +104,93 @@ func elevationFromCyberjapandata2(lat float64, lon float64) (float64, error) {
 type ElevationApiResnponse struct {
 	Elevation interface{} `json:"elevation"`
 	HSrc      interface{} `json:"hsrc"`
+}
+
+//go:embed data/*.csv
+var f embed.FS
+
+// 経度 lon, 緯度 lat の補完に必要なマスタ読み取り
+func NewElevationMaster(lat float64, lon float64) *ElevationMaster {
+	ele := &ElevationMaster{
+		DfMsmEle:  make([][]float64, 0),
+		DfMeshEle: make(map[int]map[int]float64),
+	}
+
+	mesh1d, _ := MeshCodeFromLatLon(lat, lon)
+
+	// MSM地点の標高データの読込
+	ele.ReadMsmElevation()
+
+	// 3次メッシュの標高データの読込
+	ele.Read3dMeshElevation(mesh1d)
+
+	return ele
+}
+
+// 2次メッシュコードまでの標高データを読み取り
+func (ele *ElevationMaster) ReadMsmElevation() {
+	// Open the CSV file
+	content, err := f.ReadFile("data/MSM_elevation.csv")
+	if err != nil {
+		panic(err)
+	}
+
+	// Create a new CSV reader
+	reader := csv.NewReader(bytes.NewBuffer(content))
+
+	// Read all records at once
+	records, err := reader.ReadAll()
+	if err != nil {
+		panic(err)
+	}
+
+	// Print the records
+	elemap := make([][]float64, len(records))
+	for i, record := range records {
+		elemap[i] = make([]float64, len(record))
+		for j := 0; j < len(record); j++ {
+			elemap[i][j], err = strconv.ParseFloat(record[j], 64)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	ele.DfMsmEle = elemap
+}
+
+func (ele *ElevationMaster) Read3dMeshElevation(meshcode_1d int) {
+	// Open the CSV file
+	content, err := f.ReadFile(fmt.Sprintf("data/mesh_3d_ele_%d.csv", meshcode_1d))
+	if err != nil {
+		panic(err)
+	}
+
+	// Create a new CSV reader
+	reader := csv.NewReader(bytes.NewBuffer(content))
+
+	// Skip a header
+	_, _ = reader.Read()
+
+	// Read all records at once
+	records, err := reader.ReadAll()
+	if err != nil {
+		panic(err)
+	}
+
+	// Print the records
+	elemap := make(map[int]float64, len(records))
+	for _, record := range records {
+		meshcode, err := strconv.Atoi(record[0])
+		if err != nil {
+			panic(err)
+		}
+		elevation, err := strconv.ParseFloat(record[1], 64)
+		if err != nil {
+			panic(err)
+		}
+		elemap[meshcode] = elevation
+	}
+
+	ele.DfMeshEle[meshcode_1d] = elemap
 }

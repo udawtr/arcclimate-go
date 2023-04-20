@@ -16,6 +16,40 @@ go install github.com/udawtr/arcclimate-go@latest
 arcclimate-go 33.8834976 130.8751773 --mode EA -o test.csv
 ```
 
+## Using as library
+
+Install
+```
+go get github.com/udawtr/arcclimate-go/arcclimate
+```
+
+Edit main.go
+```
+package main
+
+import (
+	"bytes"
+	"fmt"
+
+	"github.com/udawtr/arcclimate-go/arcclimate"
+)
+
+func main() {
+	data := arcclimate.Interpolate(33.88, 130.8, 2012, 2018, "api", "EA", true, "Perez", ".cache")
+
+	var buf *bytes.Buffer = bytes.NewBuffer([]byte{})
+	data.ToCSV(buf)
+	fmt.Print(buf.String())
+}
+```
+
+Run
+```
+go run main.go
+```
+
+CAUTION: The interface to the library is still under development and unstable.
+
 ## Difference from Python version
 
 * Run very fast. More than 10x.

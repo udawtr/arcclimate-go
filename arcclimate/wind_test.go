@@ -1,4 +1,4 @@
-package main // mainパッケージであることを宣言
+package arcclimate
 
 import (
 	"testing"

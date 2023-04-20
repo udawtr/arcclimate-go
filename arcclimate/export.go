@@ -1,4 +1,4 @@
-package main
+package arcclimate
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 )
 
 // CSV形式
-func (df_save *MsmTarget) to_csv(buf *bytes.Buffer) {
+func (df_save *MsmTarget) ToCSV(buf *bytes.Buffer) {
 	buf.WriteString("date")
 	buf.WriteString(",TMP")
 	buf.WriteString(",MR")
@@ -81,7 +81,7 @@ func (df_save *MsmTarget) to_csv(buf *bytes.Buffer) {
 //
 //	法線面直達日射量、水平面天空日射量、水平面夜間日射量は0を出力します。
 //	曜日の祝日判定を行っていません。
-func (df *MsmTarget) to_has(out *bytes.Buffer) {
+func (df *MsmTarget) ToHAS(out *bytes.Buffer) {
 	for d := 0; d < 365; d++ {
 		off := d * 24
 
@@ -149,7 +149,7 @@ func (df *MsmTarget) to_has(out *bytes.Buffer) {
 //	"EnergyPlus Auxilary Programs"を参考に記述されました。
 //	外気温(単位:℃)、風向(単位:°)、風速(単位:m/s)、降水量の積算値(単位:mm/h)のみを出力します。
 //	それ以外の値については、"missing"に該当する値を出力します。
-func (msm *MsmTarget) to_epw(out *bytes.Buffer, lat float64, lon float64) {
+func (msm *MsmTarget) ToEPW(out *bytes.Buffer, lat float64, lon float64) {
 
 	// LOCATION
 	// 国名,緯度,経度,タイムゾーンのみ出力

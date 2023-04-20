@@ -14,4 +14,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/udawtr/arcclimate_go => ./arcclimate
+//replace github.com/udawtr/arcclimate_go => ./arcclimate

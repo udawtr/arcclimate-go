@@ -3,8 +3,8 @@
 ## Quick Start
 
 ```
-go build main/*.go
-./arcclimate 33.8834976 130.8751773 --mode EA -o test.csv
+go install github.com/udawtr/arcclimate-go
+arcclimate-go 33.8834976 130.8751773 --mode EA -o test.csv
 ```
 
 ## Difference from Python version

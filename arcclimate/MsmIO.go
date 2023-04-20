@@ -48,7 +48,7 @@ func LoadMsmFiles(msm_list []string, msm_file_dir string) MsmDataSet {
 		log.Printf("MSM読み込み完了 %s", ret.Msm.name)
 	}
 
-	return MsmDataSet{Data: [4]MsmData(df_msm_list)}
+	return MsmDataSet{Data: df_msm_list}
 }
 
 type MsmAndIndex struct {

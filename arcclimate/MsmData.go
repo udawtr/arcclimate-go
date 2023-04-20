@@ -25,7 +25,7 @@ type MsmDataRow struct {
 }
 
 type MsmDataSet struct {
-	Data [4]MsmData
+	Data []MsmData
 }
 
 func (msm *MsmData) Length() int {

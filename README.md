@@ -3,8 +3,9 @@
 ## Quick Start
 
 ```
-go install github.com/udawtr/arcclimate-go
-arcclimate-go 33.8834976 130.8751773 --mode EA -o test.csv
+sudo apt install golang # if you didnot install golang
+go install github.com/udawtr/arcclimate-go@latest
+~/go/bin/arcclimate-go 33.8834976 130.8751773 --mode EA -o test.csv
 ```
 
 ## Difference from Python version

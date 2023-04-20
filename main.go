@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/akamensky/argparse"
-	"github.com/udawtr/arcclimate_go/arcclimate"
+	"github.com/udawtr/arcclimate-go/arcclimate"
 )
 
 func main() {

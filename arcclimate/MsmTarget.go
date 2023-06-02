@@ -41,8 +41,8 @@ type MsmTarget struct {
 
 // 開始年 start_year から 終了年 end_year までのデータを抜き出して新しい構造体を作成します。
 func (df_msm *MsmTarget) ExctactMsmYear(start_year int, end_year int) *MsmTarget {
-	start_time := time.Date(start_year, 1, 1, 0, 0, 0, 0, time.Local)
-	end_time := time.Date(end_year, 12, 31, 23, 0, 0, 0, time.Local)
+	start_time := time.Date(start_year, 1, 1, 0, 0, 0, 0, time.UTC)
+	end_time := time.Date(end_year, 12, 31, 23, 0, 0, 0, time.UTC)
 	return df_msm.ExctactMsm(start_time, end_time)
 }
 

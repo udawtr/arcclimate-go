@@ -756,8 +756,8 @@ func (msmt *MsmTarget) patchRepYears(repYears []int) *MsmTarget {
 		month := time.Month(i + 1)
 
 		// 当該代表年月の開始日とその次月開始日
-		start_date := time.Date(year, month, 1, 0, 0, 0, 0, time.Local)
-		end_date := time.Date(year, month, mdays[int(month)-1], 23, 0, 0, 0, time.Local)
+		start_date := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+		end_date := time.Date(year, month, mdays[int(month)-1], 23, 0, 0, 0, time.UTC)
 
 		// 抜き出した代表データ
 		df_temp := msmt.ExctactMsm(start_date, end_date)
@@ -781,7 +781,7 @@ func (msmt *MsmTarget) patchRepYears(repYears []int) *MsmTarget {
 	}
 
 	for i := 0; i < len(EA.date); i++ {
-		EA.date[i] = time.Date(1970, EA.date[i].Month(), EA.date[i].Day(), EA.date[i].Hour(), 0, 0, 0, time.Local)
+		EA.date[i] = time.Date(1970, EA.date[i].Month(), EA.date[i].Day(), EA.date[i].Hour(), 0, 0, 0, time.UTC)
 	}
 
 	// 接合部の円滑化
@@ -818,7 +818,7 @@ func SmoothingMonths(repYears []int) []SmootingMonth {
 		after_year := int(repYears[i])
 
 		// 前月と対象月では対象年が異なる または 前月が2月かつその代表年が閏年の場合
-		before_year_date := time.Date(before_year, time.December, 31, 0, 0, 0, 0, time.Local)
+		before_year_date := time.Date(before_year, time.December, 31, 0, 0, 0, 0, time.UTC)
 		if before_year != after_year || (target == 3 && before_year_date.YearDay() == 366) {
 			mlist = append(mlist, SmootingMonth{target, before_year, after_year})
 		}
@@ -847,13 +847,13 @@ func (EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, msmt *MsmTarget) {
 	}
 
 	// 対象月の1970年における対象月の1日
-	center := time.Date(1970, after_month, 1, 0, 0, 0, 0, time.Local)
+	center := time.Date(1970, after_month, 1, 0, 0, 0, 0, time.UTC)
 
 	// 前月の代表年における対象月の1日
-	before := time.Date(before_year, after_month, 1, 0, 0, 0, 0, time.Local)
+	before := time.Date(before_year, after_month, 1, 0, 0, 0, 0, time.UTC)
 
 	// 対象月の代表年における対象月の1日
-	after := time.Date(int(after_year), after_month, 1, 0, 0, 0, 0, time.Local)
+	after := time.Date(int(after_year), after_month, 1, 0, 0, 0, 0, time.UTC)
 
 	var timestamp [13]time.Time
 	var df_before, df_after *MsmTarget
@@ -862,19 +862,19 @@ func (EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, msmt *MsmTarget) {
 		// 12月と1月の結合(年をまたぐ)
 
 		// 前月の代表年における12月31日18時
-		before_start := time.Date(int(before_year), 12, 31, 18, 0, 0, 0, time.Local)
+		before_start := time.Date(int(before_year), 12, 31, 18, 0, 0, 0, time.UTC)
 
 		// 前月の代表年の翌年の1月1日6時
-		before_end := time.Date(int(before_year+1), 1, 1, 6, 0, 0, 0, time.Local)
+		before_end := time.Date(int(before_year+1), 1, 1, 6, 0, 0, 0, time.UTC)
 
 		// 前月の代表年の12月31日18時から翌年1月1日6時までのMSMデータフレーム
 		df_before = msmt.ExctactMsm(before_start, before_end)
 
 		// 対象月の代表年の前年の12月31日18時
-		after_start := time.Date(int(after_year-1), 12, 31, 18, 0, 0, 0, time.Local)
+		after_start := time.Date(int(after_year-1), 12, 31, 18, 0, 0, 0, time.UTC)
 
 		// 対象月の代表年の1月1日6時
-		after_end := time.Date(int(after_year), 1, 1, 6, 0, 0, 0, time.Local)
+		after_end := time.Date(int(after_year), 1, 1, 6, 0, 0, 0, time.UTC)
 
 		// 対象月の代表年の前年12月31日18時から翌年1月1日6時までのMSMデータフレーム
 		df_after = msmt.ExctactMsm(after_start, after_end)
@@ -882,28 +882,28 @@ func (EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, msmt *MsmTarget) {
 		// 1970年12月31日18時-23時 および 1月1日0時-6時
 		// 1970年12月31日18時-23時
 		for i := 0; i < 6; i++ {
-			timestamp[i] = time.Date(1970, 12, 31, 18+i, 0, 0, 0, time.Local)
+			timestamp[i] = time.Date(1970, 12, 31, 18+i, 0, 0, 0, time.UTC)
 		}
 
 		// 1970年1月1日0時-6時
 		for i := 0; i < 7; i++ {
-			timestamp[i+6] = time.Date(1970, 1, 1, i, 0, 0, 0, time.Local)
+			timestamp[i+6] = time.Date(1970, 1, 1, i, 0, 0, 0, time.UTC)
 		}
 
 		// 2月と3月の結合(うるう年の回避)
 	} else if after_month == 3 {
 
 		// 結合する2つの月の若い月(前月)の代表年における2月28日18時(はじまり)
-		before_start := time.Date(before_year, 2, 28, 18, 0, 0, 0, time.Local)
+		before_start := time.Date(before_year, 2, 28, 18, 0, 0, 0, time.UTC)
 
 		// 前月の代表年における3月1日6時(おわり)
-		before_end := time.Date(before_year, 3, 1, 6, 0, 0, 0, time.Local)
+		before_end := time.Date(before_year, 3, 1, 6, 0, 0, 0, time.UTC)
 
 		// 前月の代表年における2月28日18時から3月1日6時までのMSMデータフレーム
 		df_before = msmt.ExctactMsm(before_start, before_end)
 
 		// 結合する2つの月の遅い月(対象月)の代表年における2月28日18時(はじまり)
-		after_start := time.Date(after_year, 2, 28, 18, 0, 0, 0, time.Local)
+		after_start := time.Date(after_year, 2, 28, 18, 0, 0, 0, time.UTC)
 
 		// 対象月の代表年における3月1日6時(おわり)
 		after_end := after.Add(time.Hour * 6)

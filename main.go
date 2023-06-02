@@ -66,7 +66,7 @@ func main() {
 	}
 
 	// MSMフォルダの作成
-	os.MkdirAll(*msmFileDir, os.ModePerm)
+	// os.MkdirAll(*msmFileDir, os.ModePerm)
 
 	// EA方式かつ日射量の推計値を使用しない場合に開始年が2018年以上となっているか確認
 	if *mode == "EA" {
@@ -91,6 +91,8 @@ func main() {
 		*mode,
 		!*disableEst,
 		*modeSep,
+		false,
+		false,
 		*msmFileDir,
 	)
 

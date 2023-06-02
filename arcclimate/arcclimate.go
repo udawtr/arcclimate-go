@@ -22,6 +22,8 @@ func Interpolate(
 	mode string,
 	useEst bool,
 	modeSep string,
+	useCache bool,
+	saveCache bool,
 	msmFileDir string) *MsmTarget {
 
 	log.Printf("データ読み込み")
@@ -33,7 +35,7 @@ func Interpolate(
 	msmList := RequiredMsmList(lat, lon)
 
 	// MSMファイルの読込 (0.2s; 4 MSM from cache)
-	msms := LoadMsmFiles(msmList, msmFileDir)
+	msms := LoadMsmFiles(msmList, useCache, saveCache, msmFileDir)
 
 	log.Printf("補正計算")
 

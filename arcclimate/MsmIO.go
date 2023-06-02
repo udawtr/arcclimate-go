@@ -26,11 +26,13 @@ import (
 //	MsmDataSet: 読み込んだデータフレームのリスト
 //
 // """
-func LoadMsmFiles(msm_list []string, msm_file_dir string) MsmDataSet {
+func LoadMsmFiles(msm_list []string, useCache bool, saveCache bool, msm_file_dir string) MsmDataSet {
 	// 計算に必要なMSMを算出して、ダウンロード⇒ファイルpathをリストで返す
 
 	// 保存先ディレクトリの作成
-	os.Mkdir(msm_file_dir, os.ModePerm)
+	if useCache || saveCache {
+		os.Mkdir(msm_file_dir, os.ModePerm)
+	}
 
 	// MSMファイル読み込み
 	df_msm_list := make([]MsmData, len(msm_list))
@@ -39,7 +41,7 @@ func LoadMsmFiles(msm_list []string, msm_file_dir string) MsmDataSet {
 		// MSMファイルのパス
 		// MSMファイル読み込み
 		// 負の日射量が存在した際に日射量を0とする
-		go load_msm(index, msm_file_dir, msm, c, true, msm_file_dir)
+		go load_msm(index, msm_file_dir, msm, c, useCache, saveCache, msm_file_dir)
 	}
 
 	for i := 0; i < len(msm_list); i++ {
@@ -56,15 +58,15 @@ type MsmAndIndex struct {
 	Msm   MsmData
 }
 
-func load_msm(index int, msm_file_dir string, msm string, c chan MsmAndIndex, saveCache bool, output_dir string) {
+func load_msm(index int, msm_file_dir string, msm string, c chan MsmAndIndex, useCache bool, saveCache bool, output_dir string) {
 	msm_path := filepath.Join(msm_file_dir, fmt.Sprintf("%s.csv.gz", msm))
 
 	var gf *gzip.Reader
 	var gerr error
-	if !fileExists(msm_path) {
+	if useCache == false || !fileExists(msm_path) {
 		// ダウンロード元URL
-		dl_url := "https://s3.ap-northeast-1.wasabisys.com/arcclimate-ja/msm_2011_2020/"
-		//dl_url := "https://storage.googleapis.com/arcclimate-msm/"
+		//dl_url := "https://s3.ap-northeast-1.wasabisys.com/arcclimate-ja/msm_2011_2020/"
+		dl_url := "https://storage.googleapis.com/arcclimate-msm/"
 
 		var err error = nil
 		src_url := fmt.Sprintf("%s%s.csv.gz", dl_url, msm)

@@ -35,6 +35,12 @@ func (msm_target *MsmTarget) SeparateSolarRadiation(
 	//時刻データから太陽位置を計算
 	log.Print(" 時刻データから太陽位置を計算")
 	solpos := get_sun_position(lat, lon, msm_target.date)
+	msm_target.h = make([]float64, len(solpos))
+	msm_target.A = make([]float64, len(solpos))
+	for i, v := range solpos {
+		msm_target.h[i] = v.h
+		msm_target.A[i] = v.A
+	}
 
 	//2種の日射量データについて繰り返し
 	log.Print(" 2種の日射量データについて繰り返し")

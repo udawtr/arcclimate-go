@@ -743,6 +743,8 @@ func (msmt *MsmTarget) patchRepYears(repYears []int) *MsmTarget {
 		Pw:     []float64{},
 		DT:     []float64{},
 		NR:     []float64{},
+		h:      []float64{},
+		A:      []float64{},
 		SR_est: []SolarRadiation{},
 		SR_msm: []SolarRadiation{},
 	}
@@ -776,6 +778,8 @@ func (msmt *MsmTarget) patchRepYears(repYears []int) *MsmTarget {
 		EA.Pw = append(EA.Pw, df_temp.Pw...)
 		EA.DT = append(EA.DT, df_temp.DT...)
 		EA.NR = append(EA.NR, df_temp.NR...)
+		EA.h = append(EA.h, df_temp.h...)
+		EA.A = append(EA.A, df_temp.A...)
 		EA.SR_est = append(EA.SR_est, df_temp.SR_est...)
 		EA.SR_msm = append(EA.SR_msm, df_temp.SR_msm...)
 	}

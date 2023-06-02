@@ -27,6 +27,8 @@ func (df_save *MsmTarget) ToCSV(buf *bytes.Buffer) {
 	if df_save.DT != nil {
 		buf.WriteString(",DT")
 	}
+	buf.WriteString(",h")
+	buf.WriteString(",A")
 	buf.WriteString(",DN_est")
 	buf.WriteString(",SH_est")
 	buf.WriteString(",DN_msm")
@@ -62,6 +64,8 @@ func (df_save *MsmTarget) ToCSV(buf *bytes.Buffer) {
 		if df_save.DT != nil {
 			writeFloat(df_save.DT[i])
 		}
+		writeFloat(df_save.h[i])
+		writeFloat(df_save.A[i])
 		writeFloat(df_save.SR_est[i].DN)
 		writeFloat(df_save.SR_est[i].SH)
 		writeFloat(df_save.SR_msm[i].DN)

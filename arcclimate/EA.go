@@ -960,6 +960,8 @@ func (EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, msmt *MsmTarget) {
 	UGRD := [13]float64{}
 	PRES := [13]float64{}
 	APCP01 := [13]float64{}
+	h := [13]float64{}
+	A := [13]float64{}
 	RH := [13]float64{}
 	Pw := [13]float64{}
 	NR := [13]float64{}
@@ -978,6 +980,8 @@ func (EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, msmt *MsmTarget) {
 		UGRD[i] = df_before.UGRD[i]*before_coef[i] + df_after.UGRD[i]*after_coef[i]
 		PRES[i] = df_before.PRES[i]*before_coef[i] + df_after.PRES[i]*after_coef[i]
 		APCP01[i] = df_before.APCP01[i]*before_coef[i] + df_after.APCP01[i]*after_coef[i]
+		h[i] = df_before.h[i]*before_coef[i] + df_after.h[i]*after_coef[i]
+		A[i] = df_before.A[i]*before_coef[i] + df_after.A[i]*after_coef[i]
 		RH[i] = df_before.RH[i]*before_coef[i] + df_after.RH[i]*after_coef[i]
 		Pw[i] = df_before.Pw[i]*before_coef[i] + df_after.Pw[i]*after_coef[i]
 		NR[i] = df_before.NR[i]*before_coef[i] + df_after.NR[i]*after_coef[i]
@@ -1010,6 +1014,8 @@ func (EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, msmt *MsmTarget) {
 		EA.UGRD[index] = UGRD[i]
 		EA.PRES[index] = PRES[i]
 		EA.APCP01[index] = APCP01[i]
+		EA.h[index] = h[i]
+		EA.A[index] = A[i]
 		EA.RH[index] = RH[i]
 		EA.Pw[index] = Pw[i]
 		EA.DT[index] = DT[i]

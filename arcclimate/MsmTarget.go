@@ -65,6 +65,8 @@ func (df_msm *MsmTarget) ExctactMsm(start_time time.Time, end_time time.Time) *M
 		UGRD:   append([]float64{}, df_msm.UGRD[start_index:end_index+1]...),
 		PRES:   append([]float64{}, df_msm.PRES[start_index:end_index+1]...),
 		APCP01: append([]float64{}, df_msm.APCP01[start_index:end_index+1]...),
+		h:      append([]float64{}, df_msm.h[start_index:end_index+1]...),
+		A:      append([]float64{}, df_msm.A[start_index:end_index+1]...),
 		RH:     append([]float64{}, df_msm.RH[start_index:end_index+1]...),
 		Pw:     append([]float64{}, df_msm.Pw[start_index:end_index+1]...),
 		NR:     append([]float64{}, df_msm.NR[start_index:end_index+1]...),
@@ -87,12 +89,6 @@ func (df_msm *MsmTarget) ExctactMsm(start_time time.Time, end_time time.Time) *M
 	if df_msm.w_dir != nil {
 		msm.w_dir = append([]float64{}, df_msm.w_dir[start_index:end_index+1]...)
 	}
-	if df_msm.h != nil {
-		msm.h = append([]float64{}, df_msm.h[start_index:end_index+1]...)
-	}
-	if df_msm.A != nil {
-		msm.A = append([]float64{}, df_msm.A[start_index:end_index+1]...)
-	}
 
 	return &msm
 }
@@ -108,6 +104,8 @@ func (df_msm *MsmTarget) filterMsmLeapYear29th() *MsmTarget {
 	UGRD := []float64{}
 	PRES := []float64{}
 	APCP01 := []float64{}
+	h := []float64{}
+	A := []float64{}
 	RH := []float64{}
 	Pw := []float64{}
 	NR := []float64{}
@@ -128,6 +126,8 @@ func (df_msm *MsmTarget) filterMsmLeapYear29th() *MsmTarget {
 			UGRD = append(UGRD, df_msm.UGRD[i])
 			PRES = append(PRES, df_msm.PRES[i])
 			APCP01 = append(APCP01, df_msm.APCP01[i])
+			h = append(h, df_msm.h[i])
+			A = append(A, df_msm.A[i])
 			RH = append(RH, df_msm.RH[i])
 			Pw = append(Pw, df_msm.Pw[i])
 			NR = append(NR, df_msm.NR[i])
@@ -149,6 +149,8 @@ func (df_msm *MsmTarget) filterMsmLeapYear29th() *MsmTarget {
 		UGRD:   UGRD,
 		PRES:   PRES,
 		APCP01: APCP01,
+		h:      h,
+		A:      A,
 		RH:     RH,
 		Pw:     Pw,
 		NR:     NR,

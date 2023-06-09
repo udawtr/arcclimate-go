@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -65,8 +66,8 @@ func load_msm(index int, msm_file_dir string, msm string, c chan MsmAndIndex, us
 	var gerr error
 	if useCache == false || !fileExists(msm_path) {
 		// ダウンロード元URL
-		//dl_url := "https://s3.ap-northeast-1.wasabisys.com/arcclimate-ja/msm_2011_2020/"
-		dl_url := "https://storage.googleapis.com/arcclimate-msm/"
+		dl_url := "https://s3.ap-northeast-1.wasabisys.com/arcclimate-ja/msm_2011_2020/"
+		//dl_url := "https://storage.googleapis.com/arcclimate-msm/"
 
 		var err error = nil
 		src_url := fmt.Sprintf("%s%s.csv.gz", dl_url, msm)
@@ -143,18 +144,51 @@ func load_msm(index int, msm_file_dir string, msm string, c chan MsmAndIndex, us
 			panic(cerr)
 		}
 
-		date, _ := time.Parse("2006-01-02 15:04:05", row[0])
-		TMP, _ := strconv.ParseFloat(row[1], 64)
-		MR, _ := strconv.ParseFloat(row[2], 64)
-		DSWRF_est, _ := strconv.ParseFloat(row[3], 64)
-		DSWRF_msm, _ := strconv.ParseFloat(row[4], 64)
-		Ld, _ := strconv.ParseFloat(row[5], 64)
-		VGRD, _ := strconv.ParseFloat(row[6], 64)
-		UGRD, _ := strconv.ParseFloat(row[7], 64)
-		PRES, _ := strconv.ParseFloat(row[8], 64)
-		APCP01, _ := strconv.ParseFloat(row[9], 64)
+		date, err := time.Parse("2006-01-02 15:04:05", row[0])
+		if err != nil {
+			panic(err)
+		}
+		TMP, err := strconv.ParseFloat(row[1], 64)
+		if err != nil {
+			panic(err)
+		}
+		MR, err := strconv.ParseFloat(row[2], 64)
+		if err != nil {
+			panic(err)
+		}
+		DSWRF_est, err := strconv.ParseFloat(row[3], 64)
+		if err != nil {
+			panic(err)
+		}
+		var DSWRF_msm float64 = math.NaN()
+		if row[4] != "" {
+			DSWRF_msm, err = strconv.ParseFloat(row[4], 64)
+			if err != nil {
+				panic(err)
+			}
+		}
+		Ld, err := strconv.ParseFloat(row[5], 64)
+		if err != nil {
+			panic(err)
+		}
+		VGRD, err := strconv.ParseFloat(row[6], 64)
+		if err != nil {
+			panic(err)
+		}
+		UGRD, err := strconv.ParseFloat(row[7], 64)
+		if err != nil {
+			panic(err)
+		}
+		PRES, err := strconv.ParseFloat(row[8], 64)
+		if err != nil {
+			panic(err)
+		}
+		APCP01, err := strconv.ParseFloat(row[9], 64)
+		if err != nil {
+			panic(err)
+		}
 
-		if DSWRF_msm < 0.0 {
+		if !math.IsNaN(DSWRF_msm) && DSWRF_msm < 0.0 {
 			DSWRF_msm = 0.0
 		}
 		if DSWRF_est < 0.0 {

@@ -46,9 +46,13 @@ func (msm_target *MsmTarget) SeparateSolarRadiation(
 	log.Print(" 2種の日射量データについて繰り返し")
 	if msm_target.DSWRF_est != nil {
 		msm_target.SR_est = get_separate_core(msm_target, ele_target, mode_separation, msm_target.DSWRF_est, solpos)
+	} else {
+		msm_target.SR_est = make([]SolarRadiation, len(solpos))
 	}
 	if msm_target.DSWRF_msm != nil {
 		msm_target.SR_msm = get_separate_core(msm_target, ele_target, mode_separation, msm_target.DSWRF_msm, solpos)
+	} else {
+		msm_target.SR_msm = make([]SolarRadiation, len(solpos))
 	}
 }
 
@@ -83,6 +87,8 @@ func get_separate_core(msm_target *MsmTarget,
 		} else if mode_separation == "Watanabe" {
 			//Watanabe方式でSHを計算
 			method_SH = func_SH_Watanabe
+		} else {
+			panic(mode_separation)
 		}
 
 		//SHの取得
@@ -162,12 +168,14 @@ func get_SH(TH []float64, Sinh []float64, IN0 []float64, method_SH func(float64,
 
 		if Sinh[i] <= 0.0 {
 			sh = 0.0
+		} else if math.IsNaN(TH[i]) {
+			sh = math.NaN()
 		} else {
-			sh = math.Max(0.0,
-				get_SH_core(TH[i],
-					Sinh[i],
-					IN0[i],
-					method_SH))
+			sh = get_SH_core(TH[i],
+				Sinh[i],
+				IN0[i],
+				method_SH)
+			sh = math.Max(0.0, sh)
 		}
 		SH[i] = sh
 	}
@@ -203,12 +211,16 @@ func get_SH_core(TH float64,
 	//Pの最大値 上限値を設定するか要検討
 	const P_max = 0.85
 
+	if math.IsNaN(TH) {
+		return math.NaN()
+	}
+
 	a := 0.0 //大気透過率の範囲は0～1
 	b := 1.2 //太陽高度が小さい条件でPが1を超えることがある
 
 	// 2分法で収束計算(中間値の定理を満たしていない)
 	for {
-		P := (a + b) / 2
+		P := (a + b) / 2.0
 		SH := method_SH(P, IN0, Sinh)
 		TH0 := func_TH(P, IN0, Sinh, SH)
 
@@ -224,7 +236,9 @@ func get_SH_core(TH float64,
 		} else if b <= P_min { //上限値がP_minより小さい
 			return math.Min(method_SH(P_min, IN0, Sinh), TH)
 		} else if P <= LIMIT2*10 { //PがLIMIT2の10倍以下（限りなく0に近い）
-			return math.Min(method_SH(0.0, IN0, Sinh), TH)
+			SH = method_SH(0.0, IN0, Sinh)
+			SH_fix := math.Min(SH, TH)
+			return SH_fix
 		} else if math.Abs(a-b) <= LIMIT2 { //収束していない
 			return math.NaN()
 		} else if TH0 < TH {
@@ -270,7 +284,7 @@ func func_TH(P float64,
 func func_SH_Nagata(P float64,
 	IN0 float64,
 	Sinh float64) float64 {
-	return IN0 * Sinh * (1.0 - math.Pow(P, 1/Sinh)) * (0.66 - 0.32*Sinh) * (0.5 + (0.4-0.3*P)*Sinh)
+	return IN0 * Sinh * (1.0 - math.Pow(P, 1.0/Sinh)) * (0.66 - 0.32*Sinh) * (0.5 + (0.4-0.3*P)*Sinh)
 }
 
 // SHの予測 Watanabeモデル
@@ -294,8 +308,8 @@ func func_SH_Watanabe(P float64,
 		P = 1.0
 	}
 
-	Q := (0.8672 + 0.7505*Sinh) * (math.Pow(P, 0.421*1/Sinh)) * (math.Pow(1-math.Pow(P, 1/Sinh), 2.277))
-	return IN0 * Sinh * (Q / (1 + Q))
+	Q := (0.8672 + 0.7505*Sinh) * (math.Pow(P, 0.421*1.0/Sinh)) * (math.Pow(1.0-math.Pow(P, 1.0/Sinh), 2.277))
+	return IN0 * Sinh * (Q / (1.0 + Q))
 }
 
 // SHからDNを計算する
@@ -341,7 +355,9 @@ func get_SH_Erbs(TH []float64,
 	for i := 0; i < dataL; i++ {
 		var sh float64
 
-		if TH[i] <= 0.0 {
+		if math.IsNaN(TH[i]) {
+			sh = math.NaN()
+		} else if TH[i] <= 0.0 {
 			sh = 0.0
 		} else {
 			KT := math.Min(1.0, //KTが1.0を超えるときは1.0
@@ -459,8 +475,10 @@ func get_DN_Udagawa(TH []float64,
 	for i := 0; i < dataL; i++ {
 		var dn float64
 
-		//水平面全天日射量が0.0の場合、法線面直達日射量を0.0
-		if TH[i] <= 0.0 {
+		if math.IsNaN(TH[i]) {
+			dn = math.NaN()
+		} else if TH[i] <= 0.0 {
+			//水平面全天日射量が0.0の場合、法線面直達日射量を0.0
 			dn = 0.0
 		} else {
 			//KC:1次式と3次式の接続点であり、太陽高度の関数

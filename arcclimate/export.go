@@ -3,6 +3,7 @@ package arcclimate
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"strconv"
 )
 
@@ -42,7 +43,11 @@ func (df_save *MsmTarget) ToCSV(buf *bytes.Buffer) {
 
 	writeFloat := func(v float64) {
 		buf.WriteString(",")
-		buf.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
+		if v != 0.0 {
+			buf.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
+		} else {
+			buf.WriteString("0.0")
+		}
 	}
 	for i := 0; i < len(df_save.date); i++ {
 		buf.WriteString(df_save.date[i].Format("2006-01-02 15:04:05"))
@@ -68,8 +73,16 @@ func (df_save *MsmTarget) ToCSV(buf *bytes.Buffer) {
 		writeFloat(df_save.A[i])
 		writeFloat(df_save.SR_est[i].DN)
 		writeFloat(df_save.SR_est[i].SH)
-		writeFloat(df_save.SR_msm[i].DN)
-		writeFloat(df_save.SR_msm[i].SH)
+		if !math.IsNaN(df_save.SR_msm[i].DN) {
+			writeFloat(df_save.SR_msm[i].DN)
+		} else {
+			buf.WriteString(",")
+		}
+		if !math.IsNaN(df_save.SR_msm[i].SH) {
+			writeFloat(df_save.SR_msm[i].SH)
+		} else {
+			buf.WriteString(",")
+		}
 		if df_save.NR != nil {
 			writeFloat(df_save.NR[i])
 		}

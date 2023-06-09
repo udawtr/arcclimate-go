@@ -990,10 +990,12 @@ func (EA *MsmTarget) smoothMonthGaps(sm SmootingMonth, msmt *MsmTarget) {
 			df_before.SR_est[i].DN*before_coef[i] + df_after.SR_est[i].DN*after_coef[i],
 			df_before.SR_est[i].DT*before_coef[i] + df_after.SR_est[i].DT*after_coef[i],
 		}
-		AAA_msm[i] = SolarRadiation{
-			df_before.SR_msm[i].SH*before_coef[i] + df_after.SR_msm[i].SH*after_coef[i],
-			df_before.SR_msm[i].DN*before_coef[i] + df_after.SR_msm[i].DN*after_coef[i],
-			df_before.SR_msm[i].DT*before_coef[i] + df_after.SR_msm[i].DT*after_coef[i],
+		if !math.IsNaN(df_before.SR_msm[i].SH) && !math.IsNaN(df_after.SR_msm[i].SH) {
+			AAA_msm[i] = SolarRadiation{
+				df_before.SR_msm[i].SH*before_coef[i] + df_after.SR_msm[i].SH*after_coef[i],
+				df_before.SR_msm[i].DN*before_coef[i] + df_after.SR_msm[i].DN*after_coef[i],
+				df_before.SR_msm[i].DT*before_coef[i] + df_after.SR_msm[i].DT*after_coef[i],
+			}
 		}
 		DT[i] = df_before.DT[i]*before_coef[i] + df_after.DT[i]*after_coef[i]
 		// w_spd, w_dir はVGRD, UGRDから再計算する

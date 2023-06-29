@@ -10,18 +10,18 @@ import (
 
 // ベクトル風速 UGRD, VGRD から16方位の風向風速 w_dir, w_spd を計算
 func (msm *MsmTarget) WindVectorToDirAndSpeed() {
-	msm.w_spd = make([]float64, len(msm.date))
-	msm.w_dir = make([]float64, len(msm.date))
+	msm.W_spd = make([]float64, len(msm.date))
+	msm.W_dir = make([]float64, len(msm.date))
 
 	for i := 0; i < len(msm.date); i++ {
 		// 風向風速の計算
 		w_spd16, w_dir16 := Wind16(msm.UGRD[i], msm.VGRD[i])
 
 		// 風速(16方位)
-		msm.w_spd[i] = w_spd16
+		msm.W_spd[i] = w_spd16
 
 		// 風向(16方位)
-		msm.w_dir[i] = w_dir16
+		msm.W_dir[i] = w_dir16
 	}
 }
 

@@ -86,8 +86,8 @@ func (df_save *MsmTarget) ToCSV(buf *bytes.Buffer) {
 		if df_save.NR != nil {
 			writeFloat(df_save.NR[i])
 		}
-		writeFloat(df_save.w_spd[i])
-		writeFloat(df_save.w_dir[i])
+		writeFloat(df_save.W_spd[i])
+		writeFloat(df_save.W_dir[i])
 		buf.WriteString("\n")
 	}
 }
@@ -137,12 +137,12 @@ func (df *MsmTarget) ToHAS(out *bytes.Buffer) {
 
 		// 風向 (0:無風,1:NNE,...,16:N)
 		for h := 0; h < 24; h++ {
-			w_dir := int(df.w_dir[off+h]/22.5) + 1
+			w_dir := int(df.W_dir[off+h]/22.5) + 1
 			if w_dir == 0 {
 				// 真北の場合を0から16へ変更
 				w_dir = 16
 			}
-			if df.w_spd[off+h] == 0 {
+			if df.W_spd[off+h] == 0 {
 				w_dir = 0 // 無風の場合は0
 			}
 
@@ -152,7 +152,7 @@ func (df *MsmTarget) ToHAS(out *bytes.Buffer) {
 
 		// 風速 (0.1m/s)
 		for h := 0; h < 24; h++ {
-			w_spd := int(df.w_dir[off+h] * 10)
+			w_spd := int(df.W_dir[off+h] * 10)
 			out.Write([]byte(fmt.Sprintf("%3d", w_spd)))
 		}
 		out.Write([]byte(fmt.Sprintf("%s7\n", day_signature)))
@@ -210,6 +210,6 @@ func (msm *MsmTarget) ToEPW(out *bytes.Buffer, lat float64, lon float64) {
 		// N22-N32: missing
 		// N33: APCP01
 		// N34: missing
-		out.Write([]byte(fmt.Sprintf("%d,%d,%d,%d,60,-,%.1f,99.9,999,999999,999,9999,9999,9999,9999,9999,999999,999999,999999,9999,%d,%.1f,99,99,9999,99999,9,999999999,999,0.999,999,99,999,%.1f,99\n", msm.date[i].Year(), msm.date[i].Month(), msm.date[i].Day(), msm.date[i].Hour()+1, msm.TMP[i], int(msm.w_dir[i]), msm.w_spd[i], msm.APCP01[i])))
+		out.Write([]byte(fmt.Sprintf("%d,%d,%d,%d,60,-,%.1f,99.9,999,999999,999,9999,9999,9999,9999,9999,999999,999999,999999,9999,%d,%.1f,99,99,9999,99999,9,999999999,999,0.999,999,99,999,%.1f,99\n", msm.date[i].Year(), msm.date[i].Month(), msm.date[i].Day(), msm.date[i].Hour()+1, msm.TMP[i], int(msm.W_dir[i]), msm.W_spd[i], msm.APCP01[i])))
 	}
 }

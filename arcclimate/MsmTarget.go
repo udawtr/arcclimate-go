@@ -23,8 +23,8 @@ type MsmTarget struct {
 	DSWRF []float64 //標準年の計算時に使用するDSWRF
 
 	//追加項目
-	w_spd []float64 //11.参照時刻時点の風速の瞬時値 (単位:m/s)
-	w_dir []float64 //12.参照時刻時点の風向の瞬時値 (単位:°)
+	W_spd []float64 //11.参照時刻時点の風速の瞬時値 (単位:m/s)
+	W_dir []float64 //12.参照時刻時点の風向の瞬時値 (単位:°)
 	h     []float64 //13.参照時刻時点の太陽高度角 (単位:°)
 	A     []float64 //14.参照時刻時点の太陽方位角 (単位:°)
 
@@ -83,11 +83,11 @@ func (df_msm *MsmTarget) ExctactMsm(start_time time.Time, end_time time.Time) *M
 	if df_msm.DSWRF_msm != nil {
 		msm.DSWRF_msm = append([]float64{}, df_msm.DSWRF_msm[start_index:end_index+1]...)
 	}
-	if df_msm.w_spd != nil {
-		msm.w_spd = append([]float64{}, df_msm.w_spd[start_index:end_index+1]...)
+	if df_msm.W_spd != nil {
+		msm.W_spd = append([]float64{}, df_msm.W_spd[start_index:end_index+1]...)
 	}
-	if df_msm.w_dir != nil {
-		msm.w_dir = append([]float64{}, df_msm.w_dir[start_index:end_index+1]...)
+	if df_msm.W_dir != nil {
+		msm.W_dir = append([]float64{}, df_msm.W_dir[start_index:end_index+1]...)
 	}
 
 	return &msm

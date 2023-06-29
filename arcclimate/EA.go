@@ -177,7 +177,7 @@ func (msm *MsmTarget) groupForTempCI() map[YearMonth]GroupDataForTempCI {
 			DSWRF:  getMean(msm.DSWRF, index_m[m]),
 			MR:     getMean(msm.MR, index_m[m]),
 			APCP01: getMean(msm.APCP01, index_m[m]),
-			w_spd:  getMean(msm.w_spd, index_m[m]),
+			w_spd:  getMean(msm.W_spd, index_m[m]),
 		}
 		//月標準偏差
 		df_temp_m_std[m] = SubGroupDataForTempCI{
@@ -185,7 +185,7 @@ func (msm *MsmTarget) groupForTempCI() map[YearMonth]GroupDataForTempCI {
 			DSWRF:  getStdDev(msm.DSWRF, index_m[m]),
 			MR:     getStdDev(msm.MR, index_m[m]),
 			APCP01: getStdDev(msm.APCP01, index_m[m]),
-			w_spd:  getStdDev(msm.w_spd, index_m[m]),
+			w_spd:  getStdDev(msm.W_spd, index_m[m]),
 		}
 	}
 
@@ -198,7 +198,7 @@ func (msm *MsmTarget) groupForTempCI() map[YearMonth]GroupDataForTempCI {
 				DSWRF:  getMean(msm.DSWRF, index_ym[ym]),
 				MR:     getMean(msm.MR, index_ym[ym]),
 				APCP01: getMean(msm.APCP01, index_ym[ym]),
-				w_spd:  getMean(msm.w_spd, index_ym[ym]),
+				w_spd:  getMean(msm.W_spd, index_ym[ym]),
 			}
 		}
 	}
@@ -364,7 +364,7 @@ func (df *MsmTarget) FSCI() map[YearMonth]FSCIData {
 	g_ymd_mean.DSWRF_mean_ymd = getMeanForYearMonthGroupDay(df.DSWRF, &g_ymd_mean)
 	g_ymd_mean.MR_mean_ymd = getMeanForYearMonthGroupDay(df.MR, &g_ymd_mean)
 	g_ymd_mean.APCP01_mean_ymd = getMeanForYearMonthGroupDay(df.APCP01, &g_ymd_mean)
-	g_ymd_mean.w_spd_mean_ymd = getMeanForYearMonthGroupDay(df.w_spd, &g_ymd_mean)
+	g_ymd_mean.w_spd_mean_ymd = getMeanForYearMonthGroupDay(df.W_spd, &g_ymd_mean)
 
 	// FS値,FS値の偏差,FS値の偏差が指定範囲内に入っているか
 	TMP_FS := g_ymd_mean.makeFS(func(msm *YMDMeanData, i int) float64 { return msm.TMP_mean_ymd[i] }, std_rate_TMP)

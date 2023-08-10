@@ -1,5 +1,12 @@
 # Golang version of arcclimate
 
+## Important Notice
+
+This repository was moved. The codebase here retains its state as of that date and will not be updated further. 
+For the latest code and activity, please refer to the repository of the receiving organization.
+
+https://github.com/DEE-BRI/arcclimate-go
+
 ## Quick Start
 
 
